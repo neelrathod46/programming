@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Student GPA Calculator</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --bg: #f8fafc;
+            --surface: #ffffff;
+            --border: #e2e8f0;
+            --text: #1e293b;
+        }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: var(--surface);
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        }
+        h1, h2 { color: var(--text); margin-top: 0; }
+        .section {
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 15px;
+        }
+        th, td {
+            text-align: left;
+            padding: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+        th { background-color: var(--bg); }
+        input[type="text"], input[type="number"] {
+            width: 100%;
+            padding: 8px;
+            box-sizing: border-box;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+        }
+        button {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:hover { background-color: #1d4ed8; }
+        button.danger { background-color: #ef4444; }
+        button.danger:hover { background-color: #b91c1c; }
+        .flex-between {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .upload-area {
+            background: #eff6ff;
+            border: 2px dashed #93c5fd;
+            padding: 20px;
+            text-align: center;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        #resultsTable th { background-color: #e0f2fe; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Student GPA Calculator</h1>
+
+    <div class="section upload-area">
+        <h2>Import Data from CSV</h2>
+        <p>Ensure your CSV has "Student Name" as the first column, followed by your criteria headers.</p>
+        <input type="file" id="csvFileInput" accept=".csv" style="padding: 10px; font-size: 16px;">
+    </div>
+
+    <div class="section" id="criteriaSection" style="display: none;">
+        <div class="flex-between">
+            <h2>1. Configure Criteria Weights</h2>
+            <p style="margin:0; color: #64748b;">Adjust the Max Marks and Weightage for the imported criteria.</p>
+        </div>
+        <table id="criteriaTable">
+            <thead>
+                <tr>
+                    <th>Criteria Name</th>
+                    <th>Max Marks</th>
+                    <th>Weightage (%)</th>
+                </tr>
+            </thead>
+            <tbody>
+                </tbody>
+        </table>
+        <p id="weightWarning" style="color: red; display: none; font-weight: bold;">Total weightage must equal exactly 100%.</p>
+    </div>
+
+    <div class="section" id="studentsSection" style="display: none;">
+        <h2>2. Verify Student Marks</h2>
+        <table id="studentsTable">
+            <thead>
+                <tr id="studentsHeaderRow">
+                    </tr>
+            </thead>
+            <tbody>
+                </tbody>
+        </table>
+    </div>
+
+    <div class="section" id="actionSection" style="text-align: center; border-bottom: none; display: none;">
+        <button style="font-size: 1.1em; padding: 15px 30px;" onclick="calculateResults()">Calculate GPA & Performance</button>
+    </div>
+
+    <div class="section" id="resultsSection" style="display: none; border-bottom: none;">
+        <h2>3. Results</h2>
+        <table id="resultsTable">
+            <thead>
+                <tr id="resultsHeaderRow">
+                    </tr>
+            </thead>
+            <tbody>
+                </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    let criteria = [];
+    let students = [];
+
+    function generateId() {
+        return Math.random().toString(36).substr(2, 9);
+    }
+
+    // --- CSV PARSING ---
+    document.getElementById('csvFileInput').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            const text = event.target.result;
+            processCSV(text);
+        };
+        reader.readAsText(file);
+    });
+
+    function processCSV(text) {
+        // Split by lines, handling both \r\n and \n
+        const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
+        if (lines.length < 2) {
+            alert("Invalid CSV: Must contain at least a header row and one data row.");
+            return;
+        }
+
+        // Parse Headers (Criteria)
+        const headers = lines[0].split(',').map(h => h.trim());
+        criteria = [];
+        
+        // Skip index 0 (Student Name), process the rest as criteria
+        for (let i = 1; i < headers.length; i++) {
+            criteria.push({
+                id: generateId(),
+                name: headers[i],
+                maxMarks: 100, // Default to 100, user will adjust
+                weight: 0      // Default to 0, user will adjust
+            });
+        }
+
+        // Parse Students
+        students = [];
+        for (let i = 1; i < lines.length; i++) {
+            const cols = lines[i].split(',').map(c => c.trim());
+            const student = {
+                id: generateId(),
+                name: cols[0],
+                marks: {}
+            };
+            
+            // Assign marks based on criteria order
+            for (let j = 1; j < cols.length; j++) {
+                if (criteria[j - 1]) {
+                    student.marks[criteria[j - 1].id] = parseFloat(cols[j]) || 0;
+                }
+            }
+            students.push(student);
+        }
+
+        // Show sections and render data
+        document.getElementById('criteriaSection').style.display = 'block';
+        document.getElementById('studentsSection').style.display = 'block';
+        document.getElementById('actionSection').style.display = 'block';
+        document.getElementById('resultsSection').style.display = 'none'; // Hide results on new upload
+        
+        renderCriteria();
+        renderStudents();
+    }
+
+    // --- CRITERIA MANAGEMENT ---
+    function renderCriteria() {
+        const tbody = document.querySelector('#criteriaTable tbody');
+        tbody.innerHTML = '';
+        let totalWeight = 0;
+
+        criteria.forEach((c) => {
+            totalWeight += Number(c.weight);
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><strong>${c.name}</strong></td>
+                <td><input type="number" min="1" value="${c.maxMarks}" onchange="updateCriteria('${c.id}', 'maxMarks', this.value)"></td>
+                <td><input type="number" min="0" max="100" value="${c.weight}" onchange="updateCriteria('${c.id}', 'weight', this.value)"></td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        document.getElementById('weightWarning').style.display = (totalWeight !== 100 && criteria.length > 0) ? 'block' : 'none';
+        renderStudents(); 
+    }
+
+    function updateCriteria(id, field, value) {
+        const crit = criteria.find(c => c.id === id);
+        if (crit) {
+            crit[field] = Number(value);
+            renderCriteria();
+        }
+    }
+
+    // --- STUDENT MANAGEMENT ---
+    function renderStudents() {
+        const headerRow = document.getElementById('studentsHeaderRow');
+        headerRow.innerHTML = `<th>Student Name</th>`;
+        criteria.forEach(c => {
+            headerRow.innerHTML += `<th>${c.name} (/${c.maxMarks})</th>`;
+        });
+
+        const tbody = document.querySelector('#studentsTable tbody');
+        tbody.innerHTML = '';
+        
+        students.forEach(s => {
+            const tr = document.createElement('tr');
+            let cols = `<td>${s.name}</td>`;
+            
+            criteria.forEach(c => {
+                const mark = s.marks[c.id] !== undefined ? s.marks[c.id] : '-';
+                cols += `<td>${mark}</td>`;
+            });
+            
+            tr.innerHTML = cols;
+            tbody.appendChild(tr);
+        });
+    }
+
+    // --- CALCULATION & RESULTS ---
+    function calculateResults() {
+        const totalWeight = criteria.reduce((sum, c) => sum + c.weight, 0);
+        if (totalWeight !== 100) {
+            alert("Error: The total weightage of all criteria must equal exactly 100%. Please adjust the weights and try again.");
+            return;
+        }
+
+        const resultsHeaderRow = document.getElementById('resultsHeaderRow');
+        resultsHeaderRow.innerHTML = `<th>Student Name</th>`;
+        criteria.forEach(c => {
+            resultsHeaderRow.innerHTML += `<th>${c.name} <br><small>(Norm. out of ${c.weight})</small></th>`;
+        });
+        resultsHeaderRow.innerHTML += `<th>Total (%)</th><th>GPA (out of 10)</th>`;
+
+        const tbody = document.querySelector('#resultsTable tbody');
+        tbody.innerHTML = '';
+
+        students.forEach(s => {
+            const tr = document.createElement('tr');
+            let cols = `<td><strong>${s.name}</strong></td>`;
+            let totalNormalizedScore = 0;
+
+            criteria.forEach(c => {
+                const rawMark = s.marks[c.id] || 0;
+                const normalizedMark = (rawMark / c.maxMarks) * c.weight;
+                totalNormalizedScore += normalizedMark;
+                
+                cols += `<td>${normalizedMark.toFixed(2)}</td>`;
+            });
+
+            const gpa = (totalNormalizedScore / 10).toFixed(2);
+
+            cols += `<td><strong>${totalNormalizedScore.toFixed(2)}%</strong></td>`;
+            cols += `<td><strong>${gpa}</strong></td>`;
+            
+            tr.innerHTML = cols;
+            tbody.appendChild(tr);
+        });
+
+        document.getElementById('resultsSection').style.display = 'block';
+        
+        // Scroll down to results
+        document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth' });
+    }
+</script>
+</body>
+</html>
