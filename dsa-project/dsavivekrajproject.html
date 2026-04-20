@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dynamic Student GPA Calculator</title>
+    <title>Dynamic Curve Grading Calculator</title>
     <style>
         :root {
             --primary: #2563eb;
@@ -61,8 +61,6 @@
             font-weight: bold;
         }
         button:hover { background-color: #1d4ed8; }
-        button.danger { background-color: #ef4444; }
-        button.danger:hover { background-color: #b91c1c; }
         .flex-between {
             display: flex;
             justify-content: space-between;
@@ -78,12 +76,22 @@
             margin-bottom: 20px;
         }
         #resultsTable th { background-color: #e0f2fe; }
+        .stats-banner {
+            background-color: #f1f5f9;
+            padding: 15px;
+            border-radius: 6px;
+            display: flex;
+            gap: 30px;
+            margin-bottom: 20px;
+            border-left: 4px solid var(--primary);
+        }
+        .stats-banner div span { font-weight: bold; font-size: 1.2em; color: var(--primary); }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>Student GPA Calculator</h1>
+    <h1>Relative Grading Calculator (Curve)</h1>
 
     <div class="section upload-area">
         <h2>Import Data from CSV</h2>
@@ -123,11 +131,15 @@
     </div>
 
     <div class="section" id="actionSection" style="text-align: center; border-bottom: none; display: none;">
-        <button style="font-size: 1.1em; padding: 15px 30px;" onclick="calculateResults()">Calculate GPA & Performance</button>
+        <button style="font-size: 1.1em; padding: 15px 30px;" onclick="calculateResults()">Calculate Curve Grades</button>
     </div>
 
     <div class="section" id="resultsSection" style="display: none; border-bottom: none;">
         <h2>3. Results</h2>
+        
+        <div class="stats-banner" id="statsBanner">
+            </div>
+
         <table id="resultsTable">
             <thead>
                 <tr id="resultsHeaderRow">
@@ -161,28 +173,24 @@
     });
 
     function processCSV(text) {
-        // Split by lines, handling both \r\n and \n
         const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
         if (lines.length < 2) {
             alert("Invalid CSV: Must contain at least a header row and one data row.");
             return;
         }
 
-        // Parse Headers (Criteria)
         const headers = lines[0].split(',').map(h => h.trim());
         criteria = [];
         
-        // Skip index 0 (Student Name), process the rest as criteria
         for (let i = 1; i < headers.length; i++) {
             criteria.push({
                 id: generateId(),
                 name: headers[i],
-                maxMarks: 100, // Default to 100, user will adjust
-                weight: 0      // Default to 0, user will adjust
+                maxMarks: 100, 
+                weight: 0      
             });
         }
 
-        // Parse Students
         students = [];
         for (let i = 1; i < lines.length; i++) {
             const cols = lines[i].split(',').map(c => c.trim());
@@ -192,7 +200,6 @@
                 marks: {}
             };
             
-            // Assign marks based on criteria order
             for (let j = 1; j < cols.length; j++) {
                 if (criteria[j - 1]) {
                     student.marks[criteria[j - 1].id] = parseFloat(cols[j]) || 0;
@@ -201,11 +208,10 @@
             students.push(student);
         }
 
-        // Show sections and render data
         document.getElementById('criteriaSection').style.display = 'block';
         document.getElementById('studentsSection').style.display = 'block';
         document.getElementById('actionSection').style.display = 'block';
-        document.getElementById('resultsSection').style.display = 'none'; // Hide results on new upload
+        document.getElementById('resultsSection').style.display = 'none';
         
         renderCriteria();
         renderStudents();
@@ -265,49 +271,102 @@
         });
     }
 
-    // --- CALCULATION & RESULTS ---
+    // --- CALCULATION & CURVE GRADING ---
     function calculateResults() {
         const totalWeight = criteria.reduce((sum, c) => sum + c.weight, 0);
         if (totalWeight !== 100) {
-            alert("Error: The total weightage of all criteria must equal exactly 100%. Please adjust the weights and try again.");
+            alert("Error: The total weightage of all criteria must equal exactly 100%.");
             return;
         }
+        if (students.length === 0) return;
 
-        const resultsHeaderRow = document.getElementById('resultsHeaderRow');
-        resultsHeaderRow.innerHTML = `<th>Student Name</th>`;
-        criteria.forEach(c => {
-            resultsHeaderRow.innerHTML += `<th>${c.name} <br><small>(Norm. out of ${c.weight})</small></th>`;
-        });
-        resultsHeaderRow.innerHTML += `<th>Total (%)</th><th>GPA (out of 10)</th>`;
-
-        const tbody = document.querySelector('#resultsTable tbody');
-        tbody.innerHTML = '';
-
-        students.forEach(s => {
-            const tr = document.createElement('tr');
-            let cols = `<td><strong>${s.name}</strong></td>`;
+        // 1. Calculate Total Normalized Scores for each student
+        const processedStudents = students.map(s => {
             let totalNormalizedScore = 0;
+            const normScores = {};
 
             criteria.forEach(c => {
                 const rawMark = s.marks[c.id] || 0;
                 const normalizedMark = (rawMark / c.maxMarks) * c.weight;
+                normScores[c.id] = normalizedMark;
                 totalNormalizedScore += normalizedMark;
-                
-                cols += `<td>${normalizedMark.toFixed(2)}</td>`;
             });
 
-            const gpa = (totalNormalizedScore / 10).toFixed(2);
+            return { ...s, normScores, totalScore: totalNormalizedScore };
+        });
 
-            cols += `<td><strong>${totalNormalizedScore.toFixed(2)}%</strong></td>`;
-            cols += `<td><strong>${gpa}</strong></td>`;
+        // 2. Calculate Mean
+        const totalClassScore = processedStudents.reduce((sum, s) => sum + s.totalScore, 0);
+        const mean = totalClassScore / processedStudents.length;
+
+        // 3. Calculate Standard Deviation (Population SD)
+        const varianceSum = processedStudents.reduce((sum, s) => sum + Math.pow(s.totalScore - mean, 2), 0);
+        const sd = Math.sqrt(varianceSum / processedStudents.length);
+
+        // 4. Assign Grades based on the standard deviation curve
+        processedStudents.forEach(s => {
+            const score = s.totalScore;
+            if (score >= mean + 1.5 * sd) {
+                s.grade = 'A';
+            } else if (score >= mean + 1.0 * sd) {
+                s.grade = 'A-';
+            } else if (score >= mean + 0.5 * sd) {
+                s.grade = 'B';
+            } else if (score >= mean) {
+                s.grade = 'B-';
+            } else if (score >= mean - 0.5 * sd) {
+                s.grade = 'C';
+            } else if (score >= mean - 1.0 * sd) {
+                s.grade = 'C-';
+            } else {
+                s.grade = 'F';
+            }
+        });
+
+        // --- RENDER RESULTS ---
+        
+        // Render Stats Banner
+        document.getElementById('statsBanner').innerHTML = `
+            <div>Class Average (Mean): <br><span id="meanValue">${mean.toFixed(2)}%</span></div>
+            <div>Standard Deviation (SD): <br><span id="sdValue">${sd.toFixed(2)}</span></div>
+            <div>Total Students: <br><span>${processedStudents.length}</span></div>
+        `;
+
+        // Render Headers
+        const resultsHeaderRow = document.getElementById('resultsHeaderRow');
+        resultsHeaderRow.innerHTML = `<th>Student Name</th>`;
+        criteria.forEach(c => {
+            resultsHeaderRow.innerHTML += `<th>${c.name} <br><small>(Out of ${c.weight})</small></th>`;
+        });
+        resultsHeaderRow.innerHTML += `<th>Total Score (%)</th><th>Final Grade</th>`;
+
+        // Render Rows
+        const tbody = document.querySelector('#resultsTable tbody');
+        tbody.innerHTML = '';
+
+        processedStudents.forEach(s => {
+            const tr = document.createElement('tr');
+            let cols = `<td><strong>${s.name}</strong></td>`;
+            
+            criteria.forEach(c => {
+                cols += `<td>${s.normScores[c.id].toFixed(2)}</td>`;
+            });
+
+            // Styling for the Final Grade
+            let gradeColor = "black";
+            if (s.grade.includes('A')) gradeColor = "green";
+            if (s.grade.includes('B')) gradeColor = "blue";
+            if (s.grade.includes('C')) gradeColor = "orange";
+            if (s.grade === 'F') gradeColor = "red";
+
+            cols += `<td><strong>${s.totalScore.toFixed(2)}%</strong></td>`;
+            cols += `<td style="color: ${gradeColor}; font-size: 1.2em;"><strong>${s.grade}</strong></td>`;
             
             tr.innerHTML = cols;
             tbody.appendChild(tr);
         });
 
         document.getElementById('resultsSection').style.display = 'block';
-        
-        // Scroll down to results
         document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth' });
     }
 </script>
