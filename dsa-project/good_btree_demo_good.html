@@ -1,0 +1,1247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>B-Tree Interactive Demo with Animation</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Fraunces:wght@400;700;900&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0e0f14;
+      --surface: #16181f;
+      --surface2: #1e2029;
+      --border: #2a2d3a;
+      --text: #e8eaf0;
+      --muted: #6b7080;
+      --accent: #f5c542;
+      --accent2: #5bc8af;
+      --danger: #e05c6a;
+      --info: #7aa2ff;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+      min-height: 100vh;
+      padding: 32px 24px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 36px;
+    }
+
+    header h1 {
+      font-family: 'Fraunces', serif;
+      font-size: 2.8rem;
+      font-weight: 900;
+      letter-spacing: -1px;
+      color: var(--accent);
+    }
+
+    header p {
+      color: var(--muted);
+      font-size: 0.82rem;
+      margin-top: 6px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .section-title {
+      font-family: 'Fraunces', serif;
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--accent2);
+      margin-bottom: 12px;
+      letter-spacing: -0.3px;
+    }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 24px;
+    }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+
+    input[type="number"] {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.95rem;
+      padding: 9px 14px;
+      border-radius: 8px;
+      width: 110px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input[type="number"]:focus { border-color: var(--accent); }
+
+    button {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.82rem;
+      font-weight: 700;
+      padding: 9px 18px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+
+    button:active { transform: scale(0.97); }
+    button:hover { opacity: 0.88; }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .btn-insert { background: var(--accent2); color: #0e0f14; }
+    .btn-delete { background: var(--danger); color: #fff; }
+    .btn-search { background: var(--accent); color: #0e0f14; }
+    .btn-clear  { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
+
+    .explanation {
+      background: var(--surface2);
+      border-left: 3px solid var(--accent);
+      border-radius: 0 8px 8px 0;
+      padding: 10px 16px;
+      font-size: 0.82rem;
+      color: var(--text);
+      min-height: 42px;
+      margin-bottom: 14px;
+      transition: border-color 0.3s;
+      line-height: 1.55;
+    }
+
+    .explanation.ok   { border-color: var(--accent2); }
+    .explanation.warn { border-color: var(--danger); }
+    .explanation.find { border-color: var(--accent); }
+    .explanation.info { border-color: var(--info); }
+
+    canvas {
+      display: block;
+      width: 100%;
+      border-radius: 8px;
+      background: var(--bg);
+    }
+
+    .compare-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      align-items: start;
+    }
+
+    .compare-box .section-title { font-size: 1rem; }
+
+    .compare-box canvas {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      min-height: 340px;
+    }
+
+    .stats-row {
+      display: flex;
+      gap: 20px;
+      margin-top: 10px;
+      font-size: 0.78rem;
+      color: var(--muted);
+      flex-wrap: wrap;
+    }
+
+    .stat {
+      display: flex;
+      gap: 6px;
+    }
+
+    .stat span {
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    .hint {
+      margin-top: 14px;
+      font-size: 0.78rem;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+
+    .hint strong { color: var(--accent2); }
+
+    @media (max-width: 700px) {
+      .compare-grid { grid-template-columns: 1fr; }
+      header h1 { font-size: 2rem; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>B-Tree Explorer</h1>
+  <p>Order-3 B-Tree (max 3 keys per node) — Interactive Demo with Animation</p>
+</header>
+
+<div class="panel">
+  <div class="section-title">B-Tree vs Binary Search Tree</div>
+
+  <div class="controls">
+    <input type="number" id="valInput" placeholder="Value" min="0" max="999" />
+    <button class="btn-insert" onclick="doInsert()">Insert</button>
+    <button class="btn-delete" onclick="doDelete()">Delete</button>
+    <button class="btn-search" onclick="doSearch()">Search</button>
+    <button class="btn-clear" onclick="doClear()">Clear</button>
+  </div>
+
+  <div class="explanation" id="explanation">Enter a value and click Insert, Delete, or Search.</div>
+
+  <div class="compare-grid" style="margin-top:14px">
+    <div class="compare-box">
+      <div class="section-title" style="color:var(--accent2)">B-Tree (Order 3)</div>
+      <canvas id="cmpBTree"></canvas>
+      <div class="stats-row">
+        <div class="stat">Height: <span id="cmpBH">0</span></div>
+        <div class="stat">Nodes: <span id="cmpBN">0</span></div>
+      </div>
+    </div>
+
+    <div class="compare-box">
+      <div class="section-title" style="color:var(--accent)">Binary Search Tree</div>
+      <canvas id="cmpBST"></canvas>
+      <div class="stats-row">
+        <div class="stat">Height: <span id="cmpBSTH">0</span></div>
+        <div class="stat">Nodes: <span id="cmpBSTN">0</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="hint">
+    Same values are inserted into both trees. The <strong>B-Tree stays shallow</strong>, while the BST can become deeper.
+    This version also animates <strong>path traversal, split, borrow, and merge</strong> in the B-Tree.
+  </div>
+</div>
+
+<script>
+  // =========================================================
+  // SETTINGS
+  // =========================================================
+  const T = 2; // B-tree minimum degree => max keys = 2T-1 = 3
+  const STEP_DELAY = 850;
+
+  // =========================================================
+  // UTILS
+  // =========================================================
+  function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  function cloneBNode(node) {
+    if (!node) return null;
+    const copy = new BNode(node.leaf);
+    copy.id = node.id;
+    copy.keys = [...node.keys];
+    copy.children = node.children.map(cloneBNode);
+    return copy;
+  }
+
+  function cloneBTree(tree) {
+    const copy = new BTree();
+    copy.root = cloneBNode(tree.root);
+    return copy;
+  }
+
+  function cloneBSTNode(node) {
+    if (!node) return null;
+    const n = new BSNode(node.key);
+    n.left = cloneBSTNode(node.left);
+    n.right = cloneBSTNode(node.right);
+    return n;
+  }
+
+  function cloneBST(tree) {
+    const t = new BSTree();
+    t.root = cloneBSTNode(tree.root);
+    return t;
+  }
+
+  // =========================================================
+  // B-TREE
+  // =========================================================
+  let B_NODE_ID = 1;
+
+  class BNode {
+    constructor(leaf = true) {
+      this.keys = [];
+      this.children = [];
+      this.leaf = leaf;
+      this.id = B_NODE_ID++;
+    }
+  }
+
+  class BTree {
+    constructor() {
+      this.root = new BNode(true);
+      this.animationSteps = [];
+    }
+
+    resetSteps() {
+      this.animationSteps = [];
+    }
+
+    snapshot(message, type = "info", meta = {}) {
+      this.animationSteps.push({
+        tree: cloneBTree(this),
+        message,
+        type,
+        meta: JSON.parse(JSON.stringify(meta))
+      });
+    }
+
+    search(k, node = this.root) {
+      let i = 0;
+      while (i < node.keys.length && k > node.keys[i]) i++;
+      if (i < node.keys.length && k === node.keys[i]) return node;
+      if (node.leaf) return null;
+      return this.search(k, node.children[i]);
+    }
+
+    searchPath(k, node = this.root, path = []) {
+      path.push(node.id);
+      let i = 0;
+      while (i < node.keys.length && k > node.keys[i]) i++;
+      if (i < node.keys.length && k === node.keys[i]) {
+        return { found: true, nodeId: node.id, path };
+      }
+      if (node.leaf) {
+        return { found: false, nodeId: node.id, path };
+      }
+      return this.searchPath(k, node.children[i], path);
+    }
+
+    insertAnimated(k) {
+      this.resetSteps();
+      this.snapshot(`Starting insertion of ${k}.`, "info", { keys: [k] });
+
+      const pathInfo = this.searchPath(k);
+      for (let i = 0; i < pathInfo.path.length; i++) {
+        this.snapshot(
+          i === 0
+            ? `Checking the root while inserting ${k}.`
+            : `Moving down to the next child while inserting ${k}.`,
+          "info",
+          { pathNodes: pathInfo.path.slice(0, i + 1), keys: [k] }
+        );
+      }
+
+      const root = this.root;
+      if (root.keys.length === 2 * T - 1) {
+        this.snapshot(
+          `Root is full, so it must be split before inserting ${k}.`,
+          "warn",
+          { splitNodeId: root.id, keys: [k] }
+        );
+        const s = new BNode(false);
+        s.children.push(this.root);
+        this.root = s;
+        this._splitChildAnimated(s, 0, k);
+      }
+      this._insertNonFullAnimated(this.root, k);
+      this.snapshot(`Insertion of ${k} completed.`, "ok", { keys: [k] });
+    }
+
+    _insertNonFullAnimated(node, k) {
+      let i = node.keys.length - 1;
+
+      if (node.leaf) {
+        this.snapshot(
+          `Reached a leaf node. Insert ${k} into this node.`,
+          "ok",
+          { activeNodeId: node.id, keys: [k] }
+        );
+
+        node.keys.push(0);
+        while (i >= 0 && node.keys[i] > k) {
+          node.keys[i + 1] = node.keys[i];
+          i--;
+        }
+        node.keys[i + 1] = k;
+
+        this.snapshot(
+          `${k} placed in sorted order inside the leaf.`,
+          "ok",
+          { activeNodeId: node.id, keys: [k] }
+        );
+      } else {
+        while (i >= 0 && node.keys[i] > k) i--;
+        i++;
+
+        this.snapshot(
+          `At internal node. Follow child ${i + 1} for ${k}.`,
+          "info",
+          { activeNodeId: node.id, keys: [k] }
+        );
+
+        if (node.children[i].keys.length === 2 * T - 1) {
+          this.snapshot(
+            `Chosen child is full. Split it before continuing.`,
+            "warn",
+            { splitNodeId: node.children[i].id, activeNodeId: node.id, keys: [k] }
+          );
+
+          this._splitChildAnimated(node, i, k);
+
+          if (k > node.keys[i]) {
+            i++;
+            this.snapshot(
+              `${k} is greater than promoted key, so move to the right split node.`,
+              "info",
+              { activeNodeId: node.children[i].id, keys: [k] }
+            );
+          } else {
+            this.snapshot(
+              `${k} stays in the left split node.`,
+              "info",
+              { activeNodeId: node.children[i].id, keys: [k] }
+            );
+          }
+        }
+
+        this._insertNonFullAnimated(node.children[i], k);
+      }
+    }
+
+    _splitChildAnimated(parent, i, insertingKey = null) {
+      const y = parent.children[i];
+      const z = new BNode(y.leaf);
+      const median = y.keys[T - 1];
+
+      this.snapshot(
+        `Splitting full node [${y.keys.join(", ")}]. Middle key ${median} moves up.`,
+        "warn",
+        { splitNodeId: y.id, activeNodeId: parent.id, promotedKey: median, keys: insertingKey !== null ? [insertingKey] : [median] }
+      );
+
+      parent.keys.splice(i, 0, median);
+      parent.children.splice(i + 1, 0, z);
+
+      z.keys = y.keys.slice(T);
+      y.keys = y.keys.slice(0, T - 1);
+
+      if (!y.leaf) {
+        z.children = y.children.slice(T);
+        y.children = y.children.slice(0, T);
+      }
+
+      this.snapshot(
+        `Split complete: left node [${y.keys.join(", ")}], promoted key [${median}], right node [${z.keys.join(", ")}].`,
+        "ok",
+        {
+          splitNodeId: y.id,
+          newRightNodeId: z.id,
+          activeNodeId: parent.id,
+          promotedKey: median,
+          keys: insertingKey !== null ? [insertingKey] : [median]
+        }
+      );
+    }
+
+    deleteAnimated(k) {
+      this.resetSteps();
+      this.snapshot(`Starting deletion of ${k}.`, "warn", { keys: [k] });
+
+      const pathInfo = this.searchPath(k);
+      for (let i = 0; i < pathInfo.path.length; i++) {
+        this.snapshot(
+          `Traversing node ${i + 1} while searching for ${k} to delete.`,
+          "info",
+          { pathNodes: pathInfo.path.slice(0, i + 1), keys: [k] }
+        );
+      }
+
+      this._deleteAnimated(this.root, k);
+
+      if (this.root.keys.length === 0 && !this.root.leaf) {
+        this.snapshot(
+          `Root became empty, so the first child becomes the new root.`,
+          "warn",
+          { keys: [k], activeNodeId: this.root.id }
+        );
+        this.root = this.root.children[0];
+      }
+
+      this.snapshot(`Deletion of ${k} completed.`, "ok", { keys: [k] });
+    }
+
+    _deleteAnimated(node, k) {
+      let idx = 0;
+      while (idx < node.keys.length && node.keys[idx] < k) idx++;
+
+      if (idx < node.keys.length && node.keys[idx] === k) {
+        if (node.leaf) {
+          this.snapshot(
+            `Key ${k} found in a leaf. Remove it directly.`,
+            "warn",
+            { activeNodeId: node.id, keys: [k] }
+          );
+          node.keys.splice(idx, 1);
+          this.snapshot(
+            `Leaf updated after deleting ${k}.`,
+            "ok",
+            { activeNodeId: node.id, keys: [k] }
+          );
+        } else {
+          this.snapshot(
+            `Key ${k} found in an internal node. Replace it using predecessor or successor.`,
+            "warn",
+            { activeNodeId: node.id, keys: [k] }
+          );
+
+          if (node.children[idx].keys.length >= T) {
+            const pred = this._getPred(node.children[idx]);
+            this.snapshot(
+              `Left child has enough keys. Replace ${k} with predecessor ${pred}.`,
+              "info",
+              { activeNodeId: node.id, keys: [k, pred] }
+            );
+            node.keys[idx] = pred;
+            this._deleteAnimated(node.children[idx], pred);
+          } else if (node.children[idx + 1].keys.length >= T) {
+            const succ = this._getSucc(node.children[idx + 1]);
+            this.snapshot(
+              `Right child has enough keys. Replace ${k} with successor ${succ}.`,
+              "info",
+              { activeNodeId: node.id, keys: [k, succ] }
+            );
+            node.keys[idx] = succ;
+            this._deleteAnimated(node.children[idx + 1], succ);
+          } else {
+            this.snapshot(
+              `Both adjacent children have minimum keys. Merge them, then continue deletion.`,
+              "warn",
+              { mergeParentId: node.id, mergeIndex: idx, keys: [k] }
+            );
+            this._mergeAnimated(node, idx);
+            this._deleteAnimated(node.children[idx], k);
+          }
+        }
+      } else {
+        if (node.leaf) {
+          this.snapshot(
+            `${k} is not present. Search reached a leaf.`,
+            "warn",
+            { activeNodeId: node.id, keys: [k] }
+          );
+          return;
+        }
+
+        let flag = (idx === node.keys.length);
+
+        this.snapshot(
+          `Move to child ${idx + 1} while deleting ${k}.`,
+          "info",
+          { activeNodeId: node.id, nextChildId: node.children[idx].id, keys: [k] }
+        );
+
+        if (node.children[idx].keys.length < T) {
+          this.snapshot(
+            `Target child has too few keys. Rebalance before descending.`,
+            "warn",
+            { activeNodeId: node.id, nextChildId: node.children[idx].id, keys: [k] }
+          );
+          this._fillAnimated(node, idx);
+        }
+
+        if (flag && idx > node.keys.length) {
+          this._deleteAnimated(node.children[idx - 1], k);
+        } else {
+          this._deleteAnimated(node.children[idx], k);
+        }
+      }
+    }
+
+    _getPred(node) {
+      while (!node.leaf) node = node.children[node.children.length - 1];
+      return node.keys[node.keys.length - 1];
+    }
+
+    _getSucc(node) {
+      while (!node.leaf) node = node.children[0];
+      return node.keys[0];
+    }
+
+    _fillAnimated(parent, idx) {
+      if (idx !== 0 && parent.children[idx - 1].keys.length >= T) {
+        this.snapshot(
+          `Borrow one key from the left sibling.`,
+          "info",
+          { borrowType: "prev", activeNodeId: parent.children[idx].id, siblingNodeId: parent.children[idx - 1].id }
+        );
+        this._borrowFromPrevAnimated(parent, idx);
+      } else if (idx !== parent.keys.length && parent.children[idx + 1].keys.length >= T) {
+        this.snapshot(
+          `Borrow one key from the right sibling.`,
+          "info",
+          { borrowType: "next", activeNodeId: parent.children[idx].id, siblingNodeId: parent.children[idx + 1].id }
+        );
+        this._borrowFromNextAnimated(parent, idx);
+      } else {
+        if (idx !== parent.keys.length) {
+          this.snapshot(
+            `Borrow is not possible. Merge child with its right sibling.`,
+            "warn",
+            { mergeParentId: parent.id, mergeIndex: idx }
+          );
+          this._mergeAnimated(parent, idx);
+        } else {
+          this.snapshot(
+            `Borrow is not possible. Merge child with its left sibling.`,
+            "warn",
+            { mergeParentId: parent.id, mergeIndex: idx - 1 }
+          );
+          this._mergeAnimated(parent, idx - 1);
+        }
+      }
+    }
+
+    _borrowFromPrevAnimated(parent, idx) {
+      const child = parent.children[idx];
+      const sibling = parent.children[idx - 1];
+
+      child.keys.unshift(parent.keys[idx - 1]);
+      parent.keys[idx - 1] = sibling.keys.pop();
+
+      if (!sibling.leaf) {
+        child.children.unshift(sibling.children.pop());
+      }
+
+      this.snapshot(
+        `Borrowed from left sibling. Parent key moves down, sibling key moves up.`,
+        "ok",
+        { activeNodeId: child.id, siblingNodeId: sibling.id, activeParentId: parent.id }
+      );
+    }
+
+    _borrowFromNextAnimated(parent, idx) {
+      const child = parent.children[idx];
+      const sibling = parent.children[idx + 1];
+
+      child.keys.push(parent.keys[idx]);
+      parent.keys[idx] = sibling.keys.shift();
+
+      if (!sibling.leaf) {
+        child.children.push(sibling.children.shift());
+      }
+
+      this.snapshot(
+        `Borrowed from right sibling. Parent key moves down, sibling key moves up.`,
+        "ok",
+        { activeNodeId: child.id, siblingNodeId: sibling.id, activeParentId: parent.id }
+      );
+    }
+
+    _mergeAnimated(parent, idx) {
+      const child = parent.children[idx];
+      const sibling = parent.children[idx + 1];
+      const middle = parent.keys[idx];
+
+      this.snapshot(
+        `Merging left child, parent key ${middle}, and right child into one node.`,
+        "warn",
+        { activeNodeId: child.id, siblingNodeId: sibling.id, activeParentId: parent.id, promotedKey: middle }
+      );
+
+      child.keys.push(parent.keys[idx], ...sibling.keys);
+      if (!child.leaf) child.children.push(...sibling.children);
+
+      parent.keys.splice(idx, 1);
+      parent.children.splice(idx + 1, 1);
+
+      this.snapshot(
+        `Merge complete. The combined node now has keys [${child.keys.join(", ")}].`,
+        "ok",
+        { activeNodeId: child.id, activeParentId: parent.id }
+      );
+    }
+
+    height(node = this.root) {
+      if (!node || node.keys.length === 0) return 0;
+      if (node.leaf) return 1;
+      return 1 + this.height(node.children[0]);
+    }
+
+    countNodes(node = this.root) {
+      if (!node || (node === this.root && node.keys.length === 0 && node.leaf)) return 0;
+      let c = 1;
+      for (const ch of node.children) c += this.countNodes(ch);
+      return c;
+    }
+  }
+
+  // =========================================================
+  // BST
+  // =========================================================
+  class BSNode {
+    constructor(k) {
+      this.key = k;
+      this.left = null;
+      this.right = null;
+    }
+  }
+
+  class BSTree {
+    constructor() {
+      this.root = null;
+    }
+
+    insert(k) {
+      this.root = this._ins(this.root, k);
+    }
+
+    _ins(node, k) {
+      if (!node) return new BSNode(k);
+      if (k < node.key) node.left = this._ins(node.left, k);
+      else if (k > node.key) node.right = this._ins(node.right, k);
+      return node;
+    }
+
+    search(k, node = this.root) {
+      if (!node) return null;
+      if (k === node.key) return node;
+      if (k < node.key) return this.search(k, node.left);
+      return this.search(k, node.right);
+    }
+
+    delete(k) {
+      this.root = this._delete(this.root, k);
+    }
+
+    _delete(node, k) {
+      if (!node) return null;
+      if (k < node.key) node.left = this._delete(node.left, k);
+      else if (k > node.key) node.right = this._delete(node.right, k);
+      else {
+        if (!node.left) return node.right;
+        if (!node.right) return node.left;
+        let succ = this._minValueNode(node.right);
+        node.key = succ.key;
+        node.right = this._delete(node.right, succ.key);
+      }
+      return node;
+    }
+
+    _minValueNode(node) {
+      while (node.left) node = node.left;
+      return node;
+    }
+
+    height(node = this.root) {
+      if (!node) return 0;
+      return 1 + Math.max(this.height(node.left), this.height(node.right));
+    }
+
+    countNodes(node = this.root) {
+      if (!node) return 0;
+      return 1 + this.countNodes(node.left) + this.countNodes(node.right);
+    }
+  }
+
+  // =========================================================
+  // GLOBAL STATE
+  // =========================================================
+  const cmpBT = new BTree();
+  const bst = new BSTree();
+
+  let isAnimating = false;
+  let renderState = {
+    tree: null,
+    highlightMeta: {}
+  };
+
+  // =========================================================
+  // CANVAS HEIGHT
+  // =========================================================
+  function setCanvasLogicalHeight(canvas, heightPx) {
+    canvas.style.height = `${heightPx}px`;
+    canvas.setAttribute("height", String(heightPx));
+  }
+
+  function getBTreeCanvasHeight(tree) {
+    const h = Math.max(tree.height(), 1);
+    return Math.max(340, 80 + h * 95);
+  }
+
+  function getBSTCanvasHeight(tree) {
+    const h = Math.max(tree.height(), 1);
+    return Math.max(340, 80 + h * 78);
+  }
+
+  // =========================================================
+  // DRAWING HELPERS
+  // =========================================================
+  function setExplanation(msg, type = "") {
+    const el = document.getElementById("explanation");
+    el.textContent = msg;
+    el.className = "explanation " + type;
+  }
+
+  function updateStats() {
+    document.getElementById("cmpBH").textContent = cmpBT.height();
+    document.getElementById("cmpBN").textContent = cmpBT.countNodes();
+    document.getElementById("cmpBSTH").textContent = bst.height();
+    document.getElementById("cmpBSTN").textContent = bst.countNodes();
+  }
+
+  function applyCanvasSetup(canvas) {
+    const dpr = window.devicePixelRatio || 1;
+    const W = canvas.offsetWidth;
+    const H = parseInt(canvas.getAttribute("height"), 10);
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+    const ctx = canvas.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    return { ctx, W, H };
+  }
+
+  function drawBTree(canvas, tree, meta = {}) {
+    setCanvasLogicalHeight(canvas, getBTreeCanvasHeight(tree));
+    const { ctx, W, H } = applyCanvasSetup(canvas);
+
+    if (!tree.root || tree.root.keys.length === 0) {
+      ctx.fillStyle = "#3a3f52";
+      ctx.font = "13px 'JetBrains Mono', monospace";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("Tree is empty", W / 2, H / 2);
+      return;
+    }
+
+    const nodeH = 34;
+    const keyW = 34;
+    const vGap = 58;
+    const pad = 10;
+    const positions = new Map();
+
+    function assignX(node, depth, offset) {
+      if (!node) return offset;
+
+      if (node.leaf) {
+        const nw = node.keys.length * keyW + pad * 2;
+        positions.set(node, {
+          x: offset + nw / 2,
+          y: depth * (nodeH + vGap) + 40,
+          w: nw,
+          h: nodeH
+        });
+        return offset + nw + 18;
+      }
+
+      let childOffset = offset;
+      const childXs = [];
+      for (const c of node.children) {
+        childOffset = assignX(c, depth + 1, childOffset);
+        childXs.push(positions.get(c).x);
+      }
+
+      const cx = (childXs[0] + childXs[childXs.length - 1]) / 2;
+      const nw = node.keys.length * keyW + pad * 2;
+      positions.set(node, {
+        x: cx,
+        y: depth * (nodeH + vGap) + 40,
+        w: nw,
+        h: nodeH
+      });
+
+      return childOffset;
+    }
+
+    assignX(tree.root, 0, 20);
+
+    let minX = Infinity, maxX = -Infinity;
+    for (const [, pos] of positions) {
+      minX = Math.min(minX, pos.x - pos.w / 2);
+      maxX = Math.max(maxX, pos.x + pos.w / 2);
+    }
+    const treeW = maxX - minX;
+    const shift = (W - treeW) / 2 - minX;
+
+    function getNodeStyle(node) {
+      const nodeId = node.id;
+      let fill = "#1e2029";
+      let stroke = "#3a3f52";
+      let lineW = 1.5;
+
+      if (meta.pathNodes && meta.pathNodes.includes(nodeId)) {
+        fill = "#1b2438";
+        stroke = "#7aa2ff";
+        lineW = 2.2;
+      }
+
+      if (meta.activeNodeId === nodeId) {
+        fill = "#203226";
+        stroke = "#5bc8af";
+        lineW = 2.5;
+      }
+
+      if (meta.splitNodeId === nodeId) {
+        fill = "#332717";
+        stroke = "#f5c542";
+        lineW = 2.6;
+      }
+
+      if (meta.siblingNodeId === nodeId) {
+        fill = "#2c1d22";
+        stroke = "#e05c6a";
+        lineW = 2.4;
+      }
+
+      if (meta.nextChildId === nodeId) {
+        fill = "#2a2233";
+        stroke = "#b38cff";
+        lineW = 2.3;
+      }
+
+      if (meta.newRightNodeId === nodeId) {
+        fill = "#183227";
+        stroke = "#5bc8af";
+        lineW = 2.5;
+      }
+
+      return { fill, stroke, lineW };
+    }
+
+    function draw(node) {
+      if (!node) return;
+      const pos = positions.get(node);
+      const x = pos.x + shift;
+      const y = pos.y;
+      const w = pos.w;
+      const h = nodeH;
+
+      for (const c of node.children) {
+        const cp = positions.get(c);
+        if (!cp) continue;
+
+        let edgeColor = "#2a2d3a";
+        let edgeW = 1.5;
+
+        if (meta.nextChildId === c.id) {
+          edgeColor = "#b38cff";
+          edgeW = 2.2;
+        }
+        if (meta.pathNodes && meta.pathNodes.includes(c.id)) {
+          edgeColor = "#7aa2ff";
+          edgeW = 2;
+        }
+
+        ctx.beginPath();
+        ctx.moveTo(x, y + h / 2);
+        ctx.lineTo(cp.x + shift, cp.y - h / 2);
+        ctx.strokeStyle = edgeColor;
+        ctx.lineWidth = edgeW;
+        ctx.stroke();
+      }
+
+      const style = getNodeStyle(node);
+
+      ctx.beginPath();
+      ctx.roundRect(x - w / 2, y - h / 2, w, h, 6);
+      ctx.fillStyle = style.fill;
+      ctx.fill();
+      ctx.strokeStyle = style.stroke;
+      ctx.lineWidth = style.lineW;
+      ctx.stroke();
+
+      ctx.font = "13px 'JetBrains Mono', monospace";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+
+      for (let i = 0; i < node.keys.length; i++) {
+        const kx = x - w / 2 + pad + i * keyW + keyW / 2;
+
+        if (i > 0) {
+          ctx.beginPath();
+          ctx.moveTo(kx - keyW / 2, y - h / 2 + 4);
+          ctx.lineTo(kx - keyW / 2, y + h / 2 - 4);
+          ctx.strokeStyle = "#2a2d3a";
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        }
+
+        let textColor = "#e8eaf0";
+        if (meta.keys && meta.keys.includes(node.keys[i])) textColor = "#f5c542";
+        if (meta.promotedKey === node.keys[i]) textColor = "#5bc8af";
+
+        ctx.fillStyle = textColor;
+        ctx.fillText(node.keys[i], kx, y + 1);
+      }
+
+      draw(node.children[0]);
+      for (let i = 1; i < node.children.length; i++) draw(node.children[i]);
+    }
+
+    draw(tree.root);
+  }
+
+  function drawBST(canvas, tree, searchKey = null) {
+    setCanvasLogicalHeight(canvas, getBSTCanvasHeight(tree));
+    const { ctx, W, H } = applyCanvasSetup(canvas);
+
+    if (!tree.root) {
+      ctx.fillStyle = "#3a3f52";
+      ctx.font = "13px 'JetBrains Mono', monospace";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("Tree is empty", W / 2, H / 2);
+      return;
+    }
+
+    const R = 16;
+    const vGap = 42;
+    const positions = new Map();
+
+    function assignPos(node, depth, lo, hi) {
+      if (!node) return;
+
+      const minWidth = 40;
+      if (hi - lo < minWidth) {
+        const mid = (lo + hi) / 2;
+        lo = mid - minWidth / 2;
+        hi = mid + minWidth / 2;
+      }
+
+      const x = (lo + hi) / 2;
+      const y = depth * (R * 2 + vGap) + 40;
+      positions.set(node, { x, y });
+
+      assignPos(node.left, depth + 1, lo, x);
+      assignPos(node.right, depth + 1, x, hi);
+    }
+
+    assignPos(tree.root, 0, 20, W - 20);
+
+    function draw(node) {
+      if (!node) return;
+      const p = positions.get(node);
+
+      if (node.left) {
+        const lp = positions.get(node.left);
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y + R);
+        ctx.lineTo(lp.x, lp.y - R);
+        ctx.strokeStyle = "#2a2d3a";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+
+      if (node.right) {
+        const rp = positions.get(node.right);
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y + R);
+        ctx.lineTo(rp.x, rp.y - R);
+        ctx.strokeStyle = "#2a2d3a";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+
+      const isSearch = searchKey !== null && node.key === searchKey;
+
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, R, 0, Math.PI * 2);
+      ctx.fillStyle = isSearch ? "#2e2800" : "#1e2029";
+      ctx.fill();
+      ctx.strokeStyle = isSearch ? "#f5c542" : "#f5c542";
+      ctx.lineWidth = isSearch ? 2.4 : 1.5;
+      ctx.stroke();
+
+      ctx.fillStyle = "#e8eaf0";
+      ctx.font = "11px 'JetBrains Mono', monospace";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(node.key, p.x, p.y + 1);
+
+      draw(node.left);
+      draw(node.right);
+    }
+
+    draw(tree.root);
+  }
+
+  function redrawAll(meta = {}, bstSearchKey = null) {
+    const treeToDraw = meta.tree || cmpBT;
+    drawBTree(document.getElementById("cmpBTree"), treeToDraw, meta.meta || {});
+    drawBST(document.getElementById("cmpBST"), bst, bstSearchKey);
+    updateStats();
+  }
+
+  function getValue() {
+    const v = parseInt(document.getElementById("valInput").value, 10);
+    return isNaN(v) ? null : v;
+  }
+
+  function disableControls(flag) {
+    document.querySelectorAll("button, input").forEach(el => {
+      el.disabled = flag;
+    });
+  }
+
+  async function playSteps(steps, bstSearchKey = null) {
+    isAnimating = true;
+    disableControls(true);
+
+    for (const step of steps) {
+      setExplanation(step.message, step.type || "info");
+      redrawAll({ tree: step.tree, meta: step.meta }, bstSearchKey);
+      await sleep(STEP_DELAY);
+    }
+
+    disableControls(false);
+    isAnimating = false;
+    redrawAll({}, bstSearchKey);
+  }
+
+  // =========================================================
+  // OPERATIONS
+  // =========================================================
+  async function doInsert() {
+    if (isAnimating) return;
+
+    const v = getValue();
+    if (v === null) {
+      setExplanation("Please enter a number first.", "warn");
+      return;
+    }
+
+    if (cmpBT.search(v)) {
+      setExplanation(`${v} already exists in the tree.`, "warn");
+      return;
+    }
+
+    cmpBT.insertAnimated(v);
+    bst.insert(v);
+
+    await playSteps(cmpBT.animationSteps);
+
+    const h = cmpBT.height();
+    setExplanation(`Inserted ${v}. Final B-Tree height is ${h}.`, "ok");
+    redrawAll();
+  }
+
+  async function doDelete() {
+    if (isAnimating) return;
+
+    const v = getValue();
+    if (v === null) {
+      setExplanation("Please enter a number first.", "warn");
+      return;
+    }
+
+    if (!cmpBT.search(v)) {
+      setExplanation(`${v} is not in the tree — nothing to delete.`, "warn");
+      return;
+    }
+
+    cmpBT.deleteAnimated(v);
+    bst.delete(v);
+
+    await playSteps(cmpBT.animationSteps);
+
+    const h = cmpBT.height();
+    setExplanation(`Deleted ${v}. Final B-Tree height is ${h}.`, "warn");
+    redrawAll();
+  }
+
+  async function doSearch() {
+    if (isAnimating) return;
+
+    const v = getValue();
+    if (v === null) {
+      setExplanation("Please enter a number first.", "warn");
+      return;
+    }
+
+    const found = cmpBT.search(v);
+    const info = cmpBT.searchPath(v);
+
+    const steps = [];
+    let tempTree = cloneBTree(cmpBT);
+
+    for (let i = 0; i < info.path.length; i++) {
+      steps.push({
+        tree: cloneBTree(tempTree),
+        message: `Searching for ${v}: visiting node ${i + 1}.`,
+        type: "info",
+        meta: { pathNodes: info.path.slice(0, i + 1), keys: [v] }
+      });
+    }
+
+    if (found) {
+      steps.push({
+        tree: cloneBTree(tempTree),
+        message: `Found ${v} in the highlighted node.`,
+        type: "find",
+        meta: { pathNodes: info.path, activeNodeId: info.nodeId, keys: [v] }
+      });
+    } else {
+      steps.push({
+        tree: cloneBTree(tempTree),
+        message: `${v} not found. Search reached a leaf without a match.`,
+        type: "warn",
+        meta: { pathNodes: info.path, activeNodeId: info.nodeId, keys: [v] }
+      });
+    }
+
+    await playSteps(steps, found ? v : null);
+
+    if (found) {
+      setExplanation(`Found ${v}.`, "find");
+      redrawAll({}, v);
+    } else {
+      setExplanation(`${v} not found.`, "warn");
+      redrawAll();
+    }
+  }
+
+  function doClear() {
+    if (isAnimating) return;
+
+    B_NODE_ID = 1;
+    cmpBT.root = new BNode(true);
+    cmpBT.resetSteps();
+    bst.root = null;
+
+    setExplanation("Tree cleared.", "");
+    redrawAll();
+  }
+
+  // =========================================================
+  // INIT
+  // =========================================================
+  window.addEventListener("load", () => {
+    redrawAll();
+
+    let resizeTimer;
+    window.addEventListener("resize", () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => redrawAll(), 100);
+    });
+
+    document.getElementById("valInput").addEventListener("keydown", e => {
+      if (e.key === "Enter") doInsert();
+    });
+  });
+</script>
+
+</body>
+</html>
