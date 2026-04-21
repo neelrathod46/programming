@@ -166,6 +166,8 @@
                 <canvas id="criteriaPerformanceChart"></canvas>
             </div>
         </div>
+        <h3>Individual Criteria Analysis</h3>
+<div class="charts-container" id="individualChartsContainer"></div>
     </div>
 </div>
 
@@ -193,7 +195,19 @@
         const headers = lines[0].split(',').map(h => h.trim());
         criteria = [];
         for (let i = 1; i < headers.length; i++) {
-            criteria.push({ id: generateId(), name: headers[i], maxMarks: 100, weight: 0 });
+            
+        const defaultMaxMarks = {
+            'midsem': 50,
+            'endsem': 50,
+            'quiz1': 50,
+            'quiz2': 50,
+            'practicals': 20,
+            'presentation': 25
+        };
+        const nameKey = headers[i].toLowerCase().trim();
+        const maxVal = defaultMaxMarks[nameKey] || 100;
+        criteria.push({ id: generateId(), name: headers[i], maxMarks: maxVal, weight: 0 });
+
         }
 
         students = [];
@@ -357,7 +371,7 @@
         });
 
         // 2. Criteria Performance Chart (Bar)
-        const ctxPerf = document.getElementById('performanceChart').getContext('2d');
+        const ctxPerf = document.getElementById('criteriaPerformanceChart').getContext('2d');
         const criteriaNames = criteria.map(c => c.name);
         const maxWeights = criteria.map(c => c.weight);
         const classAverages = criteria.map(c => criteriaStats[c.id].mean);
@@ -383,7 +397,58 @@
                 plugins: { title: { display: true, text: 'Class Average per Criteria' } },
                 scales: { y: { beginAtZero: true } }
             }
-        });
+        }); 
+        // --- INDIVIDUAL CRITERIA CHARTS ---
+// --- INDIVIDUAL CRITERIA DISTRIBUTION CHARTS ---
+const container = document.getElementById("individualChartsContainer");
+container.innerHTML = "";
+
+criteria.forEach(c => {
+    const chartDiv = document.createElement("div");
+    chartDiv.className = "chart-box";
+
+    const canvas = document.createElement("canvas");
+    chartDiv.appendChild(canvas);
+    container.appendChild(chartDiv);
+
+    // Use students (NOT processedStudents)
+    const marks = students.map(s => s.marks[c.id] || 0);
+
+    const binSize = Math.ceil(c.maxMarks / 10);
+    const bins = Array(10).fill(0);
+
+    marks.forEach(m => {
+        let index = Math.min(Math.floor(m / binSize), 9);
+        bins[index]++;
+    });
+
+    const labels = bins.map((_, i) => `${i*binSize}-${(i+1)*binSize}`);
+
+    new Chart(canvas.getContext("2d"), {
+        type: "bar",
+        data: {
+            labels: labels,
+            datasets: [{
+                label: `${c.name} Distribution`,
+                data: bins,
+                backgroundColor: "#2563eb"
+            }]
+        },
+        options: {
+            plugins: {
+                title: {
+                    display: true,
+                    text: `${c.name} Marks Distribution`
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+});
     }
 </script>
 </body>
