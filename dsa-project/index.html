@@ -196,17 +196,19 @@
         criteria = [];
         for (let i = 1; i < headers.length; i++) {
             
-        const defaultMaxMarks = {
-            'midsem': 50,
-            'endsem': 50,
-            'quiz1': 50,
-            'quiz2': 50,
-            'practicals': 20,
-            'presentation': 25
+        
+        const defaultConfigs = {
+            'midsem': { max: 50, weight: 15 },
+            'endsem': { max: 50, weight: 20 },
+            'quiz1': { max: 50, weight: 7.5 },
+            'quiz2': { max: 50, weight: 7.5 },
+            'practicals': { max: 20, weight: 25 },
+            'presentation': { max: 25, weight: 25 }
         };
         const nameKey = headers[i].toLowerCase().trim();
-        const maxVal = defaultMaxMarks[nameKey] || 100;
-        criteria.push({ id: generateId(), name: headers[i], maxMarks: maxVal, weight: 0 });
+        const config = defaultConfigs[nameKey] || { max: 100, weight: 0 };
+        criteria.push({ id: generateId(), name: headers[i], maxMarks: config.max, weight: config.weight });
+
 
         }
 
