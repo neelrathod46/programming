@@ -12,6 +12,7 @@
             --surface: #ffffff;
             --border: #e2e8f0;
             --text: #1e293b;
+            --success: #10b981;
         }
         body {
             font-family: system-ui, -apple-system, sans-serif;
@@ -28,7 +29,7 @@
             border-radius: 8px;
             box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
         }
-        h1, h2 { color: var(--text); margin-top: 0; }
+        h1, h2, h3 { color: var(--text); margin-top: 0; }
         .section {
             margin-bottom: 30px;
             padding-bottom: 20px;
@@ -62,7 +63,8 @@
             cursor: pointer;
             font-weight: bold;
         }
-        button:hover { background-color: #1d4ed8; }
+        button:hover { opacity: 0.9; }
+        .btn-success { background-color: var(--success); }
         .flex-between {
             display: flex;
             justify-content: space-between;
@@ -128,7 +130,7 @@
                 </tr>
             </thead>
             <tbody>
-                </tbody>
+            </tbody>
         </table>
         <p id="weightWarning" style="color: red; display: none; font-weight: bold;">Total weightage must equal exactly 100%.</p>
     </div>
@@ -148,7 +150,10 @@
     </div>
 
     <div class="section" id="resultsSection" style="display: none; border-bottom: none;">
-        <h2>3. Results & Analytics</h2>
+        <div class="flex-between">
+            <h2>3. Results & Analytics</h2>
+            <button class="btn-success" onclick="exportToCSV()">⬇ Export Grades to CSV</button>
+        </div>
         
         <div class="stats-banner" id="statsBanner"></div>
 
@@ -166,14 +171,16 @@
                 <canvas id="criteriaPerformanceChart"></canvas>
             </div>
         </div>
-        <h3>Individual Criteria Analysis</h3>
-<div class="charts-container" id="individualChartsContainer"></div>
+        
+        <h3 style="margin-top: 40px;">Individual Criteria Analysis</h3>
+        <div class="charts-container" id="individualChartsContainer"></div>
     </div>
 </div>
 
 <script>
     let criteria = [];
     let students = [];
+    let lastCalculatedResults = []; // Added to store results globally for export
     let gradeChartInstance = null;
     let performanceChartInstance = null;
 
@@ -195,21 +202,17 @@
         const headers = lines[0].split(',').map(h => h.trim());
         criteria = [];
         for (let i = 1; i < headers.length; i++) {
-            
-        
-        const defaultConfigs = {
-            'midsem': { max: 50, weight: 15 },
-            'endsem': { max: 50, weight: 20 },
-            'quiz1': { max: 50, weight: 7.5 },
-            'quiz2': { max: 50, weight: 7.5 },
-            'practicals': { max: 20, weight: 25 },
-            'presentation': { max: 25, weight: 25 }
-        };
-        const nameKey = headers[i].toLowerCase().trim();
-        const config = defaultConfigs[nameKey] || { max: 100, weight: 0 };
-        criteria.push({ id: generateId(), name: headers[i], maxMarks: config.max, weight: config.weight });
-
-
+            const defaultConfigs = {
+                'midsem': { max: 50, weight: 15 },
+                'endsem': { max: 50, weight: 20 },
+                'quiz1': { max: 50, weight: 7.5 },
+                'quiz2': { max: 50, weight: 7.5 },
+                'practicals': { max: 20, weight: 25 },
+                'presentation': { max: 25, weight: 25 }
+            };
+            const nameKey = headers[i].toLowerCase().trim();
+            const config = defaultConfigs[nameKey] || { max: 100, weight: 0 };
+            criteria.push({ id: generateId(), name: headers[i], maxMarks: config.max, weight: config.weight });
         }
 
         students = [];
@@ -282,6 +285,9 @@
             return { ...s, normScores, totalScore: totalNormalizedScore };
         });
 
+        // Store globally so the export function can access it
+        lastCalculatedResults = processedStudents;
+
         // 2. Class Level Stats (Overall)
         const totalClassScore = processedStudents.reduce((sum, s) => sum + s.totalScore, 0);
         const overallMean = totalClassScore / processedStudents.length;
@@ -319,7 +325,7 @@
 
         const resultsHeaderRow = document.getElementById('resultsHeaderRow');
         resultsHeaderRow.innerHTML = `<th>Student Name</th>`;
-        criteria.forEach(c => resultsHeaderRow.innerHTML += `<th>${c.name} <br><small>(/${c.weight})</small></th>`);
+        criteria.forEach(c => resultsHeaderRow.innerHTML += `<th>${c.name} <br><small>(Norm /${c.weight})</small></th>`);
         resultsHeaderRow.innerHTML += `<th>Total (%)</th><th>Grade</th>`;
 
         const tbody = document.querySelector('#resultsTable tbody');
@@ -331,7 +337,7 @@
             tbody.innerHTML += `<tr>${cols}</tr>`;
         });
 
-        // Render Footer (Averages and SDs at the bottom)
+        // Render Footer
         const tfoot = document.getElementById('resultsFooter');
         let meanHtml = `<tr><td><strong>Average (Mean)</strong></td>`;
         let sdHtml = `<tr><td><strong>Standard Deviation</strong></td>`;
@@ -348,16 +354,46 @@
         document.getElementById('resultsSection').style.display = 'block';
         document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth' });
 
-        // --- RENDER CHARTS ---
         renderCharts(gradeCounts, criteriaStats);
     }
 
+    // --- CSV EXPORT LOGIC ---
+    function exportToCSV() {
+        if (lastCalculatedResults.length === 0) return alert("Calculate results first.");
+
+        // 1. Build Headers
+        let csvContent = "Student Name,";
+        criteria.forEach(c => csvContent += `${c.name} (Raw Marks),${c.name} (Normalized Score),`);
+        csvContent += "Total Score (%),Final Curve Grade\n";
+
+        // 2. Build Rows
+        lastCalculatedResults.forEach(s => {
+            // Escape names in quotes in case they contain commas
+            let row = `"${s.name}",`;
+            criteria.forEach(c => {
+                row += `${s.marks[c.id] || 0},`;
+                row += `${s.normScores[c.id].toFixed(2)},`;
+            });
+            row += `${s.totalScore.toFixed(2)},${s.grade}\n`;
+            csvContent += row;
+        });
+
+        // 3. Trigger Download
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", "final_curve_grades.csv");
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
     function renderCharts(gradeCounts, criteriaStats) {
-        // Destroy old charts if they exist so they don't overlap
         if (gradeChartInstance) gradeChartInstance.destroy();
         if (performanceChartInstance) performanceChartInstance.destroy();
 
-        // 1. Grade Distribution Chart (Doughnut)
         const ctxGrade = document.getElementById('gradeDistributionChart').getContext('2d');
         gradeChartInstance = new Chart(ctxGrade, {
             type: 'doughnut',
@@ -372,8 +408,6 @@
             options: { plugins: { title: { display: true, text: 'Final Grade Distribution' } } }
         });
 
-        // 2. Criteria Performance Chart (Bar)
-        const ctxPerf = document.getElementById('criteriaPerformanceChart').getContext('2d');
         const criteriaNames = criteria.map(c => c.name);
         const maxWeights = criteria.map(c => c.weight);
         const classAverages = criteria.map(c => criteriaStats[c.id].mean);
@@ -383,16 +417,8 @@
             data: {
                 labels: criteriaNames,
                 datasets: [
-                    {
-                        label: 'Class Average',
-                        data: classAverages,
-                        backgroundColor: '#3b82f6',
-                    },
-                    {
-                        label: 'Max Possible Weight',
-                        data: maxWeights,
-                        backgroundColor: '#e2e8f0',
-                    }
+                    { label: 'Class Average (Normalized)', data: classAverages, backgroundColor: '#3b82f6' },
+                    { label: 'Max Possible Weight', data: maxWeights, backgroundColor: '#e2e8f0' }
                 ]
             },
             options: {
@@ -400,57 +426,41 @@
                 scales: { y: { beginAtZero: true } }
             }
         }); 
-        // --- INDIVIDUAL CRITERIA CHARTS ---
-// --- INDIVIDUAL CRITERIA DISTRIBUTION CHARTS ---
-const container = document.getElementById("individualChartsContainer");
-container.innerHTML = "";
 
-criteria.forEach(c => {
-    const chartDiv = document.createElement("div");
-    chartDiv.className = "chart-box";
+        const container = document.getElementById("individualChartsContainer");
+        container.innerHTML = "";
 
-    const canvas = document.createElement("canvas");
-    chartDiv.appendChild(canvas);
-    container.appendChild(chartDiv);
+        criteria.forEach(c => {
+            const chartDiv = document.createElement("div");
+            chartDiv.className = "chart-box";
+            const canvas = document.createElement("canvas");
+            chartDiv.appendChild(canvas);
+            container.appendChild(chartDiv);
 
-    // Use students (NOT processedStudents)
-    const marks = students.map(s => s.marks[c.id] || 0);
+            const marks = students.map(s => s.marks[c.id] || 0);
+            const binSize = Math.ceil(c.maxMarks / 10);
+            const bins = Array(10).fill(0);
 
-    const binSize = Math.ceil(c.maxMarks / 10);
-    const bins = Array(10).fill(0);
+            marks.forEach(m => {
+                let index = Math.min(Math.floor(m / binSize), 9);
+                if(isNaN(index) || index < 0) index = 0;
+                bins[index]++;
+            });
 
-    marks.forEach(m => {
-        let index = Math.min(Math.floor(m / binSize), 9);
-        bins[index]++;
-    });
+            const labels = bins.map((_, i) => `${i*binSize}-${(i+1)*binSize}`);
 
-    const labels = bins.map((_, i) => `${i*binSize}-${(i+1)*binSize}`);
-
-    new Chart(canvas.getContext("2d"), {
-        type: "bar",
-        data: {
-            labels: labels,
-            datasets: [{
-                label: `${c.name} Distribution`,
-                data: bins,
-                backgroundColor: "#2563eb"
-            }]
-        },
-        options: {
-            plugins: {
-                title: {
-                    display: true,
-                    text: `${c.name} Marks Distribution`
+            new Chart(canvas.getContext("2d"), {
+                type: "bar",
+                data: {
+                    labels: labels,
+                    datasets: [{ label: `${c.name} Distribution`, data: bins, backgroundColor: "#2563eb" }]
+                },
+                options: {
+                    plugins: { title: { display: true, text: `${c.name} Marks Distribution` } },
+                    scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
                 }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true
-                }
-            }
-        }
-    });
-});
+            });
+        });
     }
 </script>
 </body>
