@@ -130,6 +130,41 @@
     .explanation.find { border-color: var(--accent); }
     .explanation.info { border-color: var(--info); }
 
+    .step-panel {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 16px;
+      margin-bottom: 16px;
+      max-height: 240px;
+      overflow-y: auto;
+    }
+
+    .step-panel h3 {
+      color: var(--accent2);
+      font-size: 0.9rem;
+      margin-bottom: 10px;
+      font-family: 'Fraunces', serif;
+      letter-spacing: 0.02em;
+    }
+
+    .step-list {
+      padding-left: 18px;
+      margin: 0;
+    }
+
+    .step-list li {
+      margin-bottom: 8px;
+      line-height: 1.5;
+      font-size: 0.82rem;
+      color: var(--text);
+    }
+
+    .step-list li.ok { color: var(--accent2); }
+    .step-list li.warn { color: #ff8f9b; }
+    .step-list li.find { color: var(--accent); }
+    .step-list li.info { color: #9ab7ff; }
+
     canvas {
       display: block;
       width: 100%;
@@ -206,6 +241,13 @@
 
   <div class="explanation" id="explanation">Enter a value and click Insert, Delete, or Search.</div>
 
+  <div class="step-panel">
+    <h3>Operation Steps</h3>
+    <ol class="step-list" id="stepList">
+      <li class="info">Steps will appear here during insertion, deletion, and search.</li>
+    </ol>
+  </div>
+
   <div class="compare-grid" style="margin-top:14px">
     <div class="compare-box">
       <div class="section-title" style="color:var(--accent2)">B-Tree (Order 3)</div>
@@ -237,7 +279,7 @@
   // SETTINGS
   // =========================================================
   const T = 2; // B-tree minimum degree => max keys = 2T-1 = 3
-  const STEP_DELAY = 850;
+  const STEP_DELAY = 320; // faster animation
 
   // =========================================================
   // UTILS
@@ -273,6 +315,20 @@
     const t = new BSTree();
     t.root = cloneBSTNode(tree.root);
     return t;
+  }
+
+  function clearStepList() {
+    const list = document.getElementById("stepList");
+    list.innerHTML = "";
+  }
+
+  function addStep(message, type = "info") {
+    const list = document.getElementById("stepList");
+    const li = document.createElement("li");
+    li.textContent = message;
+    li.className = type;
+    list.appendChild(li);
+    list.parentElement.scrollTop = list.parentElement.scrollHeight;
   }
 
   // =========================================================
@@ -763,10 +819,6 @@
   const bst = new BSTree();
 
   let isAnimating = false;
-  let renderState = {
-    tree: null,
-    highlightMeta: {}
-  };
 
   // =========================================================
   // CANVAS HEIGHT
@@ -1061,7 +1113,7 @@
       ctx.arc(p.x, p.y, R, 0, Math.PI * 2);
       ctx.fillStyle = isSearch ? "#2e2800" : "#1e2029";
       ctx.fill();
-      ctx.strokeStyle = isSearch ? "#f5c542" : "#f5c542";
+      ctx.strokeStyle = "#f5c542";
       ctx.lineWidth = isSearch ? 2.4 : 1.5;
       ctx.stroke();
 
@@ -1099,9 +1151,11 @@
   async function playSteps(steps, bstSearchKey = null) {
     isAnimating = true;
     disableControls(true);
+    clearStepList();
 
     for (const step of steps) {
       setExplanation(step.message, step.type || "info");
+      addStep(step.message, step.type || "info");
       redrawAll({ tree: step.tree, meta: step.meta }, bstSearchKey);
       await sleep(STEP_DELAY);
     }
@@ -1125,6 +1179,8 @@
 
     if (cmpBT.search(v)) {
       setExplanation(`${v} already exists in the tree.`, "warn");
+      clearStepList();
+      addStep(`${v} already exists in the tree.`, "warn");
       return;
     }
 
@@ -1135,6 +1191,7 @@
 
     const h = cmpBT.height();
     setExplanation(`Inserted ${v}. Final B-Tree height is ${h}.`, "ok");
+    addStep(`Final result: Inserted ${v}. Final B-Tree height is ${h}.`, "ok");
     redrawAll();
   }
 
@@ -1149,6 +1206,8 @@
 
     if (!cmpBT.search(v)) {
       setExplanation(`${v} is not in the tree — nothing to delete.`, "warn");
+      clearStepList();
+      addStep(`${v} is not in the tree — nothing to delete.`, "warn");
       return;
     }
 
@@ -1159,6 +1218,7 @@
 
     const h = cmpBT.height();
     setExplanation(`Deleted ${v}. Final B-Tree height is ${h}.`, "warn");
+    addStep(`Final result: Deleted ${v}. Final B-Tree height is ${h}.`, "ok");
     redrawAll();
   }
 
@@ -1206,9 +1266,11 @@
 
     if (found) {
       setExplanation(`Found ${v}.`, "find");
+      addStep(`Final result: Found ${v}.`, "find");
       redrawAll({}, v);
     } else {
       setExplanation(`${v} not found.`, "warn");
+      addStep(`Final result: ${v} not found.`, "warn");
       redrawAll();
     }
   }
@@ -1222,6 +1284,8 @@
     bst.root = null;
 
     setExplanation("Tree cleared.", "");
+    clearStepList();
+    addStep("Tree cleared.", "info");
     redrawAll();
   }
 
