@@ -1,287 +1,1047 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <title>Grading System</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
-body { font-family: Arial; padding:20px; }
-table { border-collapse: collapse; width:100%; margin-top:10px;}
-th, td { border:1px solid #ccc; padding:8px; text-align:left;}
-th { cursor:pointer; background:#f0f0f0; }
-.section { margin-bottom:30px; }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f7f6f3;
+    --surface: #ffffff;
+    --border: #d8d5ce;
+    --border-strong: #a09d96;
+    --text: #1a1916;
+    --text-muted: #6b6860;
+    --accent: #1a1916;
+    --accent-light: #e8e6e1;
+    --grade-a: #2d6a4f;
+    --grade-b: #1e6091;
+    --grade-c: #7b4f12;
+    --grade-f: #9b1d20;
+  }
+
+  body {
+    font-family: 'IBM Plex Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  header {
+    border-bottom: 2px solid var(--text);
+    padding: 20px 40px;
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+  }
+
+  header h1 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: -0.5px;
+  }
+
+  header span {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  main { max-width: 1200px; margin: 0 auto; padding: 40px; }
+
+  .step {
+    margin-bottom: 48px;
+  }
+
+  .step-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+  }
+
+  .step-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 15px;
+    font-weight: 500;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* Upload */
+  .upload-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  .upload-box {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    padding: 24px;
+    cursor: pointer;
+    transition: border-color 0.15s;
+    position: relative;
+  }
+
+  .upload-box:hover { border-color: var(--border-strong); }
+  .upload-box.loaded { border-color: var(--text); }
+
+  .upload-box input[type=file] {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    opacity: 0; cursor: pointer;
+  }
+
+  .upload-box-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+  }
+
+  .upload-box-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+  }
+
+  .upload-status {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 6px;
+  }
+
+  .upload-status.ok { color: var(--grade-a); }
+
+  /* Tables */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  th {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    text-align: left;
+    padding: 8px 12px;
+    background: var(--accent-light);
+    border: 1px solid var(--border);
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: default;
+  }
+
+  th.sortable { cursor: pointer; }
+  th.sortable:hover { background: var(--border); }
+
+  td {
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  td.name-col {
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 13px;
+  }
+
+  td input {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    border: none;
+    background: transparent;
+    width: 60px;
+    color: var(--text);
+    outline: none;
+    border-bottom: 1px solid var(--border);
+    padding: 1px 2px;
+  }
+
+  td input:focus { border-bottom-color: var(--text); }
+
+  .team-badge {
+    display: inline-block;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    background: var(--accent-light);
+    border: 1px solid var(--border);
+    padding: 2px 6px;
+    margin-left: 6px;
+  }
+
+  /* Grades */
+  .grade { font-weight: 600; }
+  .grade-A, .grade-Aminus { color: var(--grade-a); }
+  .grade-B, .grade-Bminus { color: var(--grade-b); }
+  .grade-C, .grade-Cminus { color: var(--grade-c); }
+  .grade-F { color: var(--grade-f); }
+
+  /* Cutoffs */
+  .cutoffs-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+  }
+
+  .cutoff-cell {
+    background: var(--surface);
+    padding: 14px 10px;
+    text-align: center;
+  }
+
+  .cutoff-grade {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+
+  .cutoff-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+  }
+
+  .cutoff-cell input {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 14px;
+    width: 60px;
+    text-align: center;
+    border: 1px solid var(--border);
+    background: var(--accent-light);
+    padding: 4px;
+    color: var(--text);
+    outline: none;
+  }
+
+  .cutoff-cell input:focus { border-color: var(--text); }
+
+  /* Charts */
+  .charts-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .chart-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 24px 28px;
+  }
+
+  .chart-box canvas {
+    height: 280px !important;
+  }
+
+  .chart-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+  }
+
+  /* Buttons */
+  .btn {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    padding: 10px 24px;
+    border: 1.5px solid var(--text);
+    background: var(--text);
+    color: var(--bg);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .btn:hover { background: transparent; color: var(--text); }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--text);
+  }
+
+  .btn-ghost:hover { background: var(--text); color: var(--bg); }
+
+  .btn:disabled {
+    border-color: var(--border);
+    background: var(--border);
+    color: var(--text-muted);
+    cursor: not-allowed;
+  }
+
+  .btn-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  /* Export checkboxes */
+  .export-options {
+    display: flex;
+    gap: 0;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+    border: 1px solid var(--border);
+    width: fit-content;
+  }
+
+  .export-options label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    border-right: 1px solid var(--border);
+    background: var(--surface);
+    user-select: none;
+    transition: background 0.1s;
+  }
+
+  .export-options label:last-child { border-right: none; }
+  .export-options label:hover { background: var(--accent-light); }
+
+  .export-options input[type=checkbox] {
+    width: 12px; height: 12px;
+    accent-color: var(--text);
+    cursor: pointer;
+  }
+
+  /* Hidden */
+  .hidden { display: none !important; }
+
+  /* Divider */
+  .divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 40px 0;
+  }
+
+  /* Scrollable table wrapper */
+  .table-scroll {
+    overflow-x: auto;
+  }
+
+  .col-group-header {
+    background: var(--border) !important;
+    text-align: center !important;
+  }
+
+  .note {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 8px;
+  }
+
+  /* CDF percentile table */
+  .percentile-table {
+    margin-top: 18px;
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .percentile-table th {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    background: var(--accent-light);
+    padding: 5px 8px;
+    border: 1px solid var(--border);
+    text-align: center;
+    cursor: default;
+  }
+  .percentile-table td {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    padding: 5px 8px;
+    border: 1px solid var(--border);
+    text-align: center;
+  }
+  .percentile-table tr:nth-child(odd) td { background: var(--accent-light); }
 </style>
 </head>
-
 <body>
 
-<h1>Grading System</h1>
+<header>
+  <h1>Grading System</h1>
+  <span>Academic Tool</span>
+</header>
 
-<div class="section">
-<h3>Upload CSVs</h3>
-Marks CSV: <input type="file" id="marksCsv"><br><br>
-Teams CSV: <input type="file" id="teamsCsv">
-</div>
+<main>
 
-<div class="section" id="criteriaSection" style="display:none;">
-<h3>Criteria</h3>
-<table id="criteriaTable"></table>
-</div>
+  <!-- STEP 1: UPLOAD -->
+  <div class="step" id="stepUpload">
+    <div class="step-label">Step 01</div>
+    <div class="step-title">Upload Data</div>
+    <div class="upload-grid">
+      <div class="upload-box" id="boxStudents">
+        <input type="file" id="studentsFile" accept=".csv">
+        <div class="upload-box-label">Students CSV</div>
+        <div class="upload-box-name">Student Name, Midsem, Endsem, Quiz1, Quiz2, ...</div>
+        <div class="upload-status" id="statusStudents">No file selected</div>
+      </div>
+      <div class="upload-box" id="boxTeams">
+        <input type="file" id="teamsFile" accept=".csv">
+        <div class="upload-box-label">Teams CSV</div>
+        <div class="upload-box-name">TeamNumber, TeamName, Member_1, ..., Presentation, Lab, Project</div>
+        <div class="upload-status" id="statusTeams">No file selected</div>
+      </div>
+    </div>
+  </div>
 
-<div class="section" id="cutoffsSection" style="display:none;">
-<h3>Grade Cutoffs</h3>
-<div id="cutoffs"></div>
-</div>
+  <!-- STEP 2: CRITERIA -->
+  <div class="step hidden" id="stepCriteria">
+    <div class="step-label">Step 02</div>
+    <div class="step-title">Criteria</div>
+    <div class="table-scroll">
+      <table id="criteriaTable"></table>
+    </div>
+    <p class="note" style="margin-top:10px;">* Team criteria marks (Presentation, Lab, Project) are sourced from the Teams CSV and shared across team members.</p>
+    <br>
+    <div class="btn-row">
+      <button class="btn" onclick="runCalculation()">Calculate</button>
+    </div>
+  </div>
 
-<button onclick="calculate()">Calculate</button>
+  <!-- STEP 3: CHARTS -->
+  <div class="step hidden" id="stepCharts">
+    <div class="step-label">Step 03</div>
+    <div class="step-title">Score Distribution</div>
+    <div class="charts-grid">
+      <div class="chart-box">
+        <div class="chart-title">Histogram — Total Marks</div>
+        <canvas id="chartHistogram"></canvas>
+      </div>
+      <div class="chart-box">
+        <div class="chart-title">Bell Curve — Normal Distribution</div>
+        <canvas id="chartBell"></canvas>
+      </div>
+      <div class="chart-box">
+        <div class="chart-title">Cumulative Distribution</div>
+        <canvas id="chartCumulative"></canvas>
+        <div id="cdfPercentiles"></div>
+      </div>
+    </div>
+  </div>
 
-<div class="section" id="resultsSection" style="display:none;">
-<h3>Results</h3>
+  <!-- STEP 4: CUTOFFS -->
+  <div class="step hidden" id="stepCutoffs">
+    <div class="step-label">Step 04</div>
+    <div class="step-title">Grade Cutoffs <span style="font-size:11px;font-weight:300;color:var(--text-muted);">(score ≥ value)</span></div>
+    <div class="cutoffs-grid" id="cutoffsGrid"></div>
+    <br>
+    <div class="btn-row">
+      <button class="btn" onclick="applyGrades()">Apply Grades</button>
+    </div>
+  </div>
 
-<div id="exportOptions">
-<label><input type="checkbox" value="name" checked>Name</label>
-<label><input type="checkbox" value="total" checked>Total</label>
-<label><input type="checkbox" value="grade" checked>Grade</label>
-</div>
+  <!-- STEP 5: RESULTS -->
+  <div class="step hidden" id="stepResults">
+    <div class="step-label">Step 05</div>
+    <div class="step-title">Results</div>
 
-<button onclick="exportCSV()">Export</button>
+    <div class="export-options" id="exportOptions"></div>
 
-<table id="resultsTable"></table>
+    <div class="btn-row" style="margin-bottom:16px;">
+      <button class="btn btn-ghost" onclick="exportCSV()">Export CSV</button>
+    </div>
 
-<canvas id="bell"></canvas>
-<canvas id="cumulative"></canvas>
-<canvas id="histogram"></canvas>
+    <div class="table-scroll">
+      <table id="resultsTable"></table>
+    </div>
+  </div>
 
-</div>
+</main>
 
 <script>
-let criteria=[], students=[], rawStudents=[];
-let teams={}, teamCriteria=new Set();
-let results=[];
+// ─── State ───────────────────────────────────────────────────────────────────
+const TEAM_CRITERIA = ['presentation', 'lab', 'project'];
 
-const gradeOrder=['A','A-','B','B-','C','C-','F'];
-let cutoffs={A:85,'A-':80,B:70,'B-':60,C:50,'C-':40,F:0};
-
-document.getElementById('marksCsv').onchange=e=>{
-    const r=new FileReader();
-    r.onload=ev=>parseMarks(ev.target.result);
-    r.readAsText(e.target.files[0]);
+const DEFAULT_CONFIG = {
+  midsem:       { max: 50,  weight: 15   },
+  endsem:       { max: 50,  weight: 20   },
+  quiz1:        { max: 50,  weight: 7.5  },
+  quiz2:        { max: 50,  weight: 7.5  },
+  presentation: { max: 25,  weight: 25   },
+  lab:          { max: 15,  weight: 15   },
+  project:      { max: 10,  weight: 10   },
 };
 
-document.getElementById('teamsCsv').onchange=e=>{
-    const r=new FileReader();
-    r.onload=ev=>parseTeams(ev.target.result);
-    r.readAsText(e.target.files[0]);
+const GRADES = ['A', 'A-', 'B', 'B-', 'C', 'C-', 'F'];
+let cutoffs = { 'A': 85, 'A-': 80, 'B': 70, 'B-': 60, 'C': 50, 'C-': 40, 'F': 0 };
+
+let criteria = [];       // [{name, key, max, weight, isTeam}]
+let rawStudents = [];    // [{name, marks: {key: val}}]
+let teamData = {};       // {teamName: {members: [], marks: {key: val}}}
+let results = [];        // [{name, marks, normalized, total, grade}]
+let chartInstances = {};
+
+let studentsLoaded = false;
+let teamsLoaded = false;
+
+// ─── File Upload ──────────────────────────────────────────────────────────────
+function normalize(s) { return s.toLowerCase().replace(/[\s\-_]/g, ''); }
+
+document.getElementById('studentsFile').onchange = e => {
+  const r = new FileReader();
+  r.onload = ev => {
+    parseStudents(ev.target.result);
+    document.getElementById('boxStudents').classList.add('loaded');
+    document.getElementById('statusStudents').textContent = e.target.files[0].name;
+    document.getElementById('statusStudents').classList.add('ok');
+    studentsLoaded = true;
+    checkBothLoaded();
+  };
+  r.readAsText(e.target.files[0]);
 };
 
-function parseMarks(text){
-    let lines = text.trim().split('\n');
-    let headers = lines[0].split(',');
+document.getElementById('teamsFile').onchange = e => {
+  const r = new FileReader();
+  r.onload = ev => {
+    parseTeams(ev.target.result);
+    document.getElementById('boxTeams').classList.add('loaded');
+    document.getElementById('statusTeams').textContent = e.target.files[0].name;
+    document.getElementById('statusTeams').classList.add('ok');
+    teamsLoaded = true;
+    checkBothLoaded();
+  };
+  r.readAsText(e.target.files[0]);
+};
 
-    // normalize function (handles spaces, hyphens, case)
-    function normalize(str) {
-        return str.toLowerCase().replace(/[\s-_]/g, '');
+function checkBothLoaded() {
+  if (studentsLoaded) renderCriteria();
+}
+
+// ─── Parse ────────────────────────────────────────────────────────────────────
+function parseStudents(text) {
+  const lines = text.trim().split('\n').map(l => l.trim()).filter(Boolean);
+  const headers = lines[0].split(',').map(h => h.trim());
+
+  criteria = [];
+  for (let i = 1; i < headers.length; i++) {
+    const raw = headers[i];
+    const key = normalize(raw);
+    const cfg = DEFAULT_CONFIG[key] || { max: 100, weight: 0 };
+    criteria.push({
+      colIndex: i,
+      name: raw,
+      key,
+      max: cfg.max,
+      weight: cfg.weight,
+      isTeam: TEAM_CRITERIA.includes(key),
+    });
+  }
+
+  rawStudents = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split(',').map(c => c.trim());
+    const marks = {};
+    for (let j = 1; j < cols.length; j++) {
+      const key = criteria[j - 1]?.key;
+      if (key) marks[key] = parseFloat(cols[j]) || 0;
     }
+    rawStudents.push({ name: cols[0], marks });
+  }
+}
 
-    const defaultConfig = {
-        'midsem': { max: 50, weight: 15 },
-        'endsem': { max: 50, weight: 20 },
-        'quiz1': { max: 50, weight: 7.5 },
-        'quiz2': { max: 50, weight: 7.5 },
-        'presentation': { max: 25, weight: 25 },
-        'lab': { max: 15, weight: 15 },
-        'project': { max: 10, weight: 10 }
-    };
+function parseTeams(text) {
+  teamData = {};
+  const lines = text.trim().split('\n').map(l => l.trim()).filter(Boolean);
+  const headers = lines[0].split(',').map(h => h.trim());
 
-    criteria = [];
+  // Col 0 = TeamNumber, Col 1 = TeamName, then members/marks
+  const teamCriteriaHeaders = [];
+  const memberColIndices = [];
 
-    for (let i = 1; i < headers.length; i++) {
-        let raw = headers[i];
-        let key = normalize(raw);
+  headers.forEach((h, i) => {
+    if (i === 0 || i === 1) return; // skip TeamNumber, TeamName
+    const key = normalize(h);
+    if (TEAM_CRITERIA.includes(key)) {
+      teamCriteriaHeaders.push({ index: i, key });
+    } else {
+      memberColIndices.push(i);
+    }
+  });
 
-        let config = defaultConfig[key] || { max: 100, weight: 0 };
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split(',').map(c => c.trim());
+    const teamNumber = parseInt(cols[0]) || i;
+    const teamName   = cols[1] || `Team ${i}`;
+    const members    = memberColIndices.map(ci => cols[ci]).filter(v => v && v !== '');
+    const marks      = {};
+    teamCriteriaHeaders.forEach(({ index, key }) => {
+      marks[key] = parseFloat(cols[index]) || 0;
+    });
+    // Key by teamName for lookup; store number separately
+    teamData[teamName] = { teamNumber, teamName, members, marks };
+  }
+}
 
-        criteria.push({
-            id: i,
-            name: raw,
-            max: config.max,
-            weight: config.weight
+// ─── Criteria Table ───────────────────────────────────────────────────────────
+function renderCriteria() {
+  let html = `<tr>
+    <th>Criterion</th>
+    <th>Max Marks</th>
+    <th>Weight (%)</th>
+    <th>Type</th>
+  </tr>`;
+
+  criteria.forEach((c, idx) => {
+    html += `<tr>
+      <td class="name-col">${c.name}</td>
+      <td><input value="${c.max}" onchange="criteria[${idx}].max=+this.value"></td>
+      <td><input value="${c.weight}" onchange="criteria[${idx}].weight=+this.value"></td>
+      <td>${c.isTeam ? '<span class="team-badge">Team</span>' : '<span style="color:var(--text-muted);font-size:11px;">Individual</span>'}</td>
+    </tr>`;
+  });
+
+  document.getElementById('criteriaTable').innerHTML = html;
+  document.getElementById('stepCriteria').classList.remove('hidden');
+}
+
+// ─── Calculation ──────────────────────────────────────────────────────────────
+function getMergedStudents() {
+  return rawStudents.map(s => {
+    const marks = { ...s.marks };
+
+    // Override team criteria with team marks
+    Object.values(teamData).forEach(team => {
+      if (team.members.includes(s.name)) {
+        Object.entries(team.marks).forEach(([key, val]) => {
+          marks[key] = val;
         });
+      }
+    });
+
+    return { name: s.name, marks };
+  });
+}
+
+function runCalculation() {
+  // Build student → team lookup
+  const studentTeamMap = {};
+  Object.values(teamData).forEach(team => {
+    team.members.forEach(m => {
+      studentTeamMap[m] = { teamNumber: team.teamNumber, teamName: team.teamName };
+    });
+  });
+
+  const merged = getMergedStudents();
+
+  results = merged.map(s => {
+    const normalized = {};
+    let total = 0;
+    criteria.forEach(c => {
+      const raw = s.marks[c.key] ?? 0;
+      const norm = (raw / c.max) * c.weight;
+      normalized[c.key] = { raw, norm };
+      total += norm;
+    });
+    const teamInfo = studentTeamMap[s.name] || { teamNumber: null, teamName: '—' };
+    return { name: s.name, teamNumber: teamInfo.teamNumber, teamName: teamInfo.teamName, normalized, total, grade: getGrade(total) };
+  });
+
+  renderCharts();
+  renderCutoffsGrid();
+  renderResults();
+
+  document.getElementById('stepCharts').classList.remove('hidden');
+  document.getElementById('stepCutoffs').classList.remove('hidden');
+  document.getElementById('stepResults').classList.remove('hidden');
+
+  document.getElementById('stepCharts').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function applyGrades() {
+  results = results.map(r => ({ ...r, grade: getGrade(r.total) }));
+  renderResults();
+}
+
+// ─── Grading ──────────────────────────────────────────────────────────────────
+function getGrade(score) {
+  for (const g of GRADES) {
+    if (score >= cutoffs[g]) return g;
+  }
+  return 'F';
+}
+
+function gradeClass(g) {
+  if (g === 'A') return 'grade-A';
+  if (g === 'A-') return 'grade-Aminus';
+  if (g === 'B') return 'grade-B';
+  if (g === 'B-') return 'grade-Bminus';
+  if (g === 'C') return 'grade-C';
+  if (g === 'C-') return 'grade-Cminus';
+  return 'grade-F';
+}
+
+// ─── Cutoffs Grid ─────────────────────────────────────────────────────────────
+function renderCutoffsGrid() {
+  const GRADE_DISPLAY = { 'A': 'A', 'A-': 'A−', 'B': 'B', 'B-': 'B−', 'C': 'C', 'C-': 'C−', 'F': 'F' };
+  let html = '';
+  GRADES.forEach(g => {
+    const cls = gradeClass(g);
+    html += `<div class="cutoff-cell">
+      <div class="cutoff-grade grade ${cls}">${GRADE_DISPLAY[g]}</div>
+      <div class="cutoff-label">≥</div>
+      <input value="${cutoffs[g]}" onchange="cutoffs['${g}']=+this.value" ${g === 'F' ? 'disabled' : ''}>
+    </div>`;
+  });
+  document.getElementById('cutoffsGrid').innerHTML = html;
+}
+
+// ─── Charts ───────────────────────────────────────────────────────────────────
+const CHART_COLORS = {
+  line: '#1a1916',
+  bar: '#c5c0b5',
+  barBorder: '#1a1916',
+};
+
+function destroyChart(id) {
+  if (chartInstances[id]) { chartInstances[id].destroy(); delete chartInstances[id]; }
+}
+
+function renderCharts() {
+  const scores = results.map(r => r.total);
+  const mean = scores.reduce((a, b) => a + b, 0) / scores.length;
+  const sd = Math.sqrt(scores.reduce((a, b) => a + (b - mean) ** 2, 0) / scores.length);
+
+  // Shared Chart.js defaults
+  Chart.defaults.font.family = "'IBM Plex Mono', monospace";
+  Chart.defaults.font.size = 11;
+  Chart.defaults.color = '#6b6860';
+
+  const baseScaleOpts = {
+    grid: { color: '#e8e6e1' },
+    ticks: { color: '#6b6860' },
+    border: { color: '#d8d5ce' }
+  };
+
+  // 1. Histogram
+  destroyChart('histogram');
+  const binCount = 10;
+  const binSize = 10;
+  const bins = Array(binCount).fill(0);
+  scores.forEach(s => bins[Math.min(Math.floor(s / binSize), binCount - 1)]++);
+  const binLabels = bins.map((_, i) => `${i * binSize}–${i * binSize + binSize}`);
+
+  chartInstances['histogram'] = new Chart(document.getElementById('chartHistogram'), {
+    type: 'bar',
+    data: {
+      labels: binLabels,
+      datasets: [{
+        data: bins,
+        backgroundColor: CHART_COLORS.bar,
+        borderColor: CHART_COLORS.barBorder,
+        borderWidth: 1,
+        barPercentage: 0.95,
+        categoryPercentage: 1.0,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => `${ctx.parsed.y} student${ctx.parsed.y !== 1 ? 's' : ''}` } }
+      },
+      scales: {
+        x: { ...baseScaleOpts, title: { display: true, text: 'Score Range', color: '#6b6860' } },
+        y: { ...baseScaleOpts, title: { display: true, text: 'Students', color: '#6b6860' }, beginAtZero: true, ticks: { stepSize: 1, color: '#6b6860' } }
+      }
     }
+  });
 
-    students = [];
+  // 2. Bell curve (accurate normal PDF fitted to actual mean & SD)
+  destroyChart('bell');
+  const bellPts = [];
+  const lo = Math.max(0, mean - 3.5 * sd);
+  const hi = Math.min(100, mean + 3.5 * sd);
+  const step = (hi - lo) / 200;
+  for (let x = lo; x <= hi; x += step) {
+    bellPts.push({
+      x: parseFloat(x.toFixed(2)),
+      y: parseFloat((Math.exp(-0.5 * ((x - mean) / sd) ** 2) / (sd * Math.sqrt(2 * Math.PI))).toFixed(6))
+    });
+  }
 
-    for (let i = 1; i < lines.length; i++) {
-        let cols = lines[i].split(',');
-        let s = { name: cols[0], marks: {} };
+  chartInstances['bell'] = new Chart(document.getElementById('chartBell'), {
+    type: 'line',
+    data: {
+      datasets: [{
+        data: bellPts,
+        borderColor: CHART_COLORS.line,
+        borderWidth: 2,
+        pointRadius: 0,
+        fill: { target: 'origin', above: 'rgba(26,25,22,0.06)' }
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => `Score: ${ctx.parsed.x.toFixed(1)}  density: ${ctx.parsed.y.toFixed(4)}` } },
+        annotation: {}
+      },
+      scales: {
+        x: {
+          ...baseScaleOpts, type: 'linear', min: 0, max: 100,
+          title: { display: true, text: `Score   (μ = ${mean.toFixed(1)}, σ = ${sd.toFixed(1)})`, color: '#6b6860' },
+          ticks: { stepSize: 10, color: '#6b6860' }
+        },
+        y: { ...baseScaleOpts, title: { display: true, text: 'Density', color: '#6b6860' } }
+      }
+    }
+  });
 
-        for (let j = 1; j < cols.length; j++) {
-            let val = parseFloat(cols[j]);
-            s.marks[j] = isNaN(val) ? 0 : val;
+  // 3. Cumulative distribution — y-axis at every 10%
+  destroyChart('cumulative');
+  const sorted = [...scores].sort((a, b) => a - b);
+  const cumPts = sorted.map((v, i) => ({
+    x: parseFloat(v.toFixed(2)),
+    y: parseFloat(((i + 1) / sorted.length).toFixed(4))
+  }));
+
+  // Interpolate score at each 10th percentile
+  function scoreAtPercentile(p) {
+    const target = p / 100;
+    for (let i = 0; i < cumPts.length; i++) {
+      if (cumPts[i].y >= target) {
+        if (i === 0) return cumPts[0].x;
+        // linear interpolation
+        const lo = cumPts[i - 1], hi = cumPts[i];
+        const t = (target - lo.y) / (hi.y - lo.y);
+        return lo.x + t * (hi.x - lo.x);
+      }
+    }
+    return cumPts[cumPts.length - 1].x;
+  }
+
+  const percentileRows = [10,20,30,40,50,60,70,80,90].map(p => ({
+    p, score: scoreAtPercentile(p)
+  }));
+
+  // Render percentile table
+  let pHtml = `<table class="percentile-table"><tr>`;
+  percentileRows.forEach(r => { pHtml += `<th>${r.p}th</th>`; });
+  pHtml += `</tr><tr>`;
+  percentileRows.forEach(r => { pHtml += `<td>${r.score.toFixed(1)}</td>`; });
+  pHtml += `</tr></table>`;
+  document.getElementById('cdfPercentiles').innerHTML = pHtml;
+
+  chartInstances['cumulative'] = new Chart(document.getElementById('chartCumulative'), {
+    type: 'line',
+    data: {
+      datasets: [
+        {
+          data: cumPts,
+          borderColor: CHART_COLORS.line,
+          borderWidth: 2,
+          pointRadius: 0,
+          order: 1,
+        },
+        {
+          // scatter markers at every 10th percentile
+          type: 'scatter',
+          data: percentileRows.map(r => ({ x: parseFloat(r.score.toFixed(2)), y: r.p / 100 })),
+          borderColor: CHART_COLORS.line,
+          backgroundColor: '#ffffff',
+          pointRadius: 5,
+          pointBorderWidth: 1.5,
+          order: 0,
         }
-
-        students.push(s);
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              if (ctx.datasetIndex === 1) return `${Math.round(ctx.parsed.y * 100)}th pct → ${ctx.parsed.x.toFixed(1)}`;
+              return `${(ctx.parsed.y * 100).toFixed(0)}% scored ≤ ${ctx.parsed.x.toFixed(1)}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          ...baseScaleOpts, type: 'linear', min: 0, max: 100,
+          title: { display: true, text: 'Score', color: '#6b6860' },
+          ticks: { stepSize: 10, color: '#6b6860' }
+        },
+        y: {
+          ...baseScaleOpts, min: 0, max: 1,
+          title: { display: true, text: 'Percentile', color: '#6b6860' },
+          ticks: { stepSize: 0.1, color: '#6b6860', callback: v => `${Math.round(v * 100)}%` }
+        }
+      }
     }
-
-    rawStudents = [...students];
-
-    renderCriteria();
+  });
 }
 
-function parseTeams(text){
-    teams={};
-    let lines=text.trim().split('\n');
+// ─── Results Table ────────────────────────────────────────────────────────────
+let sortKey = 'total', sortDir = 1;
 
-    lines.forEach(line=>{
-        let cols=line.split(',');
-        let team=cols[0];
-        teams[team]={members:cols.slice(1)};
-    });
+function renderExportOptions() {
+  const cols = [
+    { value: 'name',      label: 'Name',      checked: true },
+    { value: 'teamnum',   label: 'Team #',     checked: true },
+    { value: 'teamname',  label: 'Team Name',  checked: true },
+    ...criteria.map(c => ({ value: `raw_${c.key}`,  label: c.name,           checked: true })),
+    ...criteria.map(c => ({ value: `norm_${c.key}`, label: `${c.name} (norm)`, checked: true })),
+    { value: 'total', label: 'Total', checked: true },
+    { value: 'grade', label: 'Grade', checked: true },
+  ];
+
+  document.getElementById('exportOptions').innerHTML = cols.map(col =>
+    `<label>
+      <input type="checkbox" value="${col.value}" ${col.checked ? 'checked' : ''}>
+      ${col.label}
+    </label>`
+  ).join('');
 }
 
-function renderCriteria(){
-    let html="<tr><th>Name</th><th>Max</th><th>Weight</th><th>Team?</th></tr>";
-    criteria.forEach(c=>{
-        html+=`
-        <tr>
-        <td>${c.name}</td>
-        <td><input value="${c.max}" onchange="cmax(${c.id},this.value)"></td>
-        <td><input value="${c.weight}" onchange="cweight(${c.id},this.value)"></td>
-        <td><input type="checkbox" onchange="cteam(${c.id},this.checked)"></td>
-        </tr>`;
-    });
-    document.getElementById('criteriaTable').innerHTML=html;
+function renderResults() {
+  if (!document.getElementById('exportOptions').innerHTML) renderExportOptions();
 
-    renderCutoffs();
-    document.getElementById('criteriaSection').style.display='block';
-}
-
-function cmax(id,v){criteria.find(c=>c.id==id).max=+v;}
-function cweight(id,v){criteria.find(c=>c.id==id).weight=+v;}
-function cteam(id,ch){ ch?teamCriteria.add(id):teamCriteria.delete(id); }
-
-function renderCutoffs(){
-    let d=document.getElementById('cutoffs');
-    d.innerHTML="";
-    gradeOrder.forEach(g=>{
-        d.innerHTML+=`${g} >= <input value="${cutoffs[g]}" onchange="cutoffs['${g}']=+this.value"><br>`;
-    });
-    document.getElementById('cutoffsSection').style.display='block';
-}
-
-function applyTeams(){
-    students=rawStudents.map(s=>({...s,marks:{...s.marks}}));
-
-    Object.values(teams).forEach(t=>{
-        let ref=students.find(s=>t.members.includes(s.name));
-        if(!ref)return;
-
-        t.members.forEach(name=>{
-            let st=students.find(s=>s.name==name);
-            if(!st)return;
-
-            teamCriteria.forEach(cid=>{
-                st.marks[cid]=ref.marks[cid];
-            });
-        });
-    });
-}
-
-function grade(score){
-    for(let g of gradeOrder){
-        if(score>=cutoffs[g]) return g;
+  // Sort — numeric for team number, natural locale for name/teamname
+  const sorted = [...results].sort((a, b) => {
+    if (sortKey === 'name')     return sortDir * a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+    if (sortKey === 'total')    return sortDir * (b.total - a.total);
+    if (sortKey === 'grade')    return sortDir * (GRADES.indexOf(a.grade) - GRADES.indexOf(b.grade));
+    if (sortKey === 'team') {
+      // Numeric sort by team number; nulls last
+      const an = a.teamNumber ?? Infinity;
+      const bn = b.teamNumber ?? Infinity;
+      return sortDir * (an - bn);
     }
-    return 'F';
+    return 0;
+  });
+
+  const arrowFor = key => {
+    if (sortKey !== key) return '<span style="opacity:.3"> ↕</span>';
+    return sortDir === 1 ? ' ↑' : ' ↓';
+  };
+
+  // Header — two rows for criterion groups
+  let thead = `<thead>
+    <tr>
+      <th rowspan="2" class="sortable" onclick="setSort('name')">Name${arrowFor('name')}</th>
+      <th rowspan="2" class="sortable" onclick="setSort('team')" title="Sort by team number"># · Team${arrowFor('team')}</th>`;
+
+  criteria.forEach(c => {
+    thead += `<th colspan="2" class="col-group-header">${c.name}${c.isTeam ? '<span class="team-badge">Team</span>' : ''}</th>`;
+  });
+
+  thead += `<th rowspan="2" class="sortable" onclick="setSort('total')">Total${arrowFor('total')}</th>
+      <th rowspan="2" class="sortable" onclick="setSort('grade')">Grade${arrowFor('grade')}</th>
+    </tr>
+    <tr>`;
+  criteria.forEach(() => { thead += `<th>Raw</th><th>Norm</th>`; });
+  thead += `</tr></thead>`;
+
+  // Body
+  let tbody = '<tbody>';
+  sorted.forEach(r => {
+    const teamCell = r.teamNumber !== null
+      ? `<span style="font-weight:500">#${r.teamNumber}</span> · ${r.teamName}`
+      : '—';
+    tbody += `<tr>
+      <td class="name-col">${r.name}</td>
+      <td>${teamCell}</td>`;
+    criteria.forEach(c => {
+      const { raw, norm } = r.normalized[c.key] || { raw: 0, norm: 0 };
+      tbody += `<td>${raw.toFixed(1)}</td><td>${norm.toFixed(2)}</td>`;
+    });
+    tbody += `<td><strong>${r.total.toFixed(2)}</strong></td>
+      <td><span class="grade ${gradeClass(r.grade)}">${r.grade}</span></td>
+    </tr>`;
+  });
+  tbody += '</tbody>';
+
+  document.getElementById('resultsTable').innerHTML = thead + tbody;
 }
 
-function calculate(){
-    applyTeams();
-
-    results=students.map(s=>{
-        let total=0;
-        criteria.forEach(c=>{
-            total+=(s.marks[c.id]/c.max)*c.weight;
-        });
-        return {...s,total,grade:grade(total)};
-    });
-
-    renderTable();
-    charts();
-    document.getElementById('resultsSection').style.display='block';
+function setSort(key) {
+  if (sortKey === key) sortDir *= -1;
+  else { sortKey = key; sortDir = 1; }
+  renderResults();
 }
 
-function renderTable(){
-    let html="<tr><th onclick=\"sort('name')\">Name</th><th onclick=\"sort('total')\">Total</th><th onclick=\"sort('grade')\">Grade</th></tr>";
-    results.forEach(r=>{
-        html+=`<tr><td>${r.name}</td><td>${r.total.toFixed(2)}</td><td>${r.grade}</td></tr>`;
+// ─── Export ───────────────────────────────────────────────────────────────────
+function exportCSV() {
+  const selected = new Set([...document.querySelectorAll('#exportOptions input:checked')].map(x => x.value));
+
+  const headers = [];
+  if (selected.has('name'))     headers.push('Name');
+  if (selected.has('teamnum'))  headers.push('Team #');
+  if (selected.has('teamname')) headers.push('Team Name');
+  criteria.forEach(c => {
+    if (selected.has(`raw_${c.key}`))  headers.push(c.name);
+    if (selected.has(`norm_${c.key}`)) headers.push(`${c.name} (Normalized)`);
+  });
+  if (selected.has('total')) headers.push('Total');
+  if (selected.has('grade')) headers.push('Grade');
+
+  const rows = results.map(r => {
+    const row = [];
+    if (selected.has('name'))     row.push(r.name);
+    if (selected.has('teamnum'))  row.push(r.teamNumber ?? '');
+    if (selected.has('teamname')) row.push(r.teamName);
+    criteria.forEach(c => {
+      if (selected.has(`raw_${c.key}`))  row.push((r.normalized[c.key]?.raw  ?? 0).toFixed(1));
+      if (selected.has(`norm_${c.key}`)) row.push((r.normalized[c.key]?.norm ?? 0).toFixed(2));
     });
-    document.getElementById('resultsTable').innerHTML=html;
-}
+    if (selected.has('total')) row.push(r.total.toFixed(2));
+    if (selected.has('grade')) row.push(r.grade);
+    return row.join(',');
+  });
 
-function sort(key){
-    results.sort((a,b)=>{
-        if(key==='name') return a.name.localeCompare(b.name);
-        if(key==='total') return b.total-a.total;
-        if(key==='grade') return a.grade.localeCompare(b.grade);
-    });
-    renderTable();
-}
-
-function exportCSV(){
-    let sel=[...document.querySelectorAll('#exportOptions input:checked')].map(x=>x.value);
-
-    let csv="";
-    if(sel.includes('name')) csv+="Name,";
-    if(sel.includes('total')) csv+="Total,";
-    if(sel.includes('grade')) csv+="Grade,";
-    csv+="\n";
-
-    results.forEach(r=>{
-        let row="";
-        if(sel.includes('name')) row+=r.name+",";
-        if(sel.includes('total')) row+=r.total+",";
-        if(sel.includes('grade')) row+=r.grade+",";
-        csv+=row+"\n";
-    });
-
-    let blob=new Blob([csv]);
-    let a=document.createElement('a');
-    a.href=URL.createObjectURL(blob);
-    a.download="grades.csv";
-    a.click();
-}
-
-function charts(){
-    let scores=results.map(r=>r.total);
-    let mean=scores.reduce((a,b)=>a+b)/scores.length;
-    let sd=Math.sqrt(scores.reduce((a,b)=>a+(b-mean)**2,0)/scores.length);
-
-    // bell
-    let pts=[];
-    for(let x=mean-3*sd;x<=mean+3*sd;x+=sd/10){
-        pts.push({x,y:Math.exp(-0.5*((x-mean)/sd)**2)});
-    }
-
-    new Chart(bell,{type:'line',data:{datasets:[{data:pts}]},options:{scales:{x:{type:'linear'}}}});
-
-    // cumulative
-    let sorted=[...scores].sort((a,b)=>a-b);
-    let cum=sorted.map((v,i)=>({x:v,y:(i+1)/sorted.length}));
-
-    new Chart(cumulative,{type:'line',data:{datasets:[{data:cum}]},options:{scales:{x:{type:'linear'},y:{min:0,max:1}}}});
-
-    // histogram
-    let bins=Array(10).fill(0);
-    scores.forEach(s=>{
-        bins[Math.min(Math.floor(s/10),9)]++;
-    });
-
-    new Chart(histogram,{
-        type:'bar',
-        data:{labels:bins.map((_,i)=>i*10+"-"+(i*10+10)),datasets:[{data:bins}]}
-    });
+  const csv = [headers.join(','), ...rows].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'grades.csv';
+  a.click();
 }
 </script>
-
 </body>
 </html>
