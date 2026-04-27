@@ -989,13 +989,13 @@ const gradeCutoffs = Object.keys(cutoffs).map(g => ({
 })).sort((a, b) => b.min - a.min);
 
 const gradeColors = {
-  "A":  "#22c55e",
-  "A-": "#4ade80",
-  "B":  "#3b82f6",
-  "B-": "#60a5fa",
-  "C":  "#f59e0b",
-  "C-": "#fbbf24",
-  "F":  "#ef4444"
+  "A":  "#16a34a", // Emerald Green
+  "A-": "#86efac", // Light Green
+  "B":  "#1d4ed8", // Deep Royal Blue
+  "B-": "#60a5fa", // Sky Blue (more contrast)
+  "C":  "#d97706", // Dark Amber
+  "C-": "#fbbf24", // Yellow/Amber
+  "F":  "#dc2626"  // Red
 };
 
 // Count how many students sit at each integer score so we can stack them
@@ -1005,17 +1005,18 @@ const sortedForStack = [...results].sort((a, b) => a.total - b.total);
 
 const scatterData = sortedForStack.map(r => {
   const g = getGrade(r.total);
-  const higher = gradeCutoffs
-    .filter(c => c.min > r.total)
-    .sort((a, b) => a.min - b.min)[0];
-  const deficit  = higher ? (higher.min - r.total) : 0;
-  const atRisk   = deficit > 0 && deficit <= 3;
 
-  // Assign stack position: first student at this score gets y=0, next y=1, etc.
+  // Assign stack position
   stackCounter[r.total] = (stackCounter[r.total] ?? -1) + 1;
   const stackY = stackCounter[r.total];
 
-  return { x: r.total, y: stackY, name: r.name, roll: r.roll, grade: g, deficit, atRisk, nextGrade: higher?.grade ?? null };
+  return { 
+    x: r.total, 
+    y: stackY, 
+    name: r.name, 
+    roll: r.roll, 
+    grade: g 
+  };
 });
 
 const maxStack = Math.max(...Object.values(stackCounter)) + 1;
@@ -1025,14 +1026,7 @@ const minScore = Math.min(...scores);
 const maxScore = Math.max(...scores);
 const xPad = 1;
 
-// Split into at-risk vs normal datasets
-const atRiskPoints = scatterData.filter(p => p.atRisk);
-const normalPoints = scatterData.filter(p => !p.atRisk);
-const grouped = {};
-normalPoints.forEach(p => {
-  if (!grouped[p.grade]) grouped[p.grade] = [];
-  grouped[p.grade].push(p);
-});
+
 
 const tooltipCallback = ctx => {
   const p = ctx.raw;
@@ -1042,52 +1036,70 @@ const tooltipCallback = ctx => {
   return lines;
 };
 
+// Group ALL points by grade now
+const grouped = {};
+scatterData.forEach(p => {
+  if (!grouped[p.grade]) grouped[p.grade] = [];
+  grouped[p.grade].push(p);
+});
+
 chartInstances['gap'] = new Chart(document.getElementById('chartGap'), {
   type: 'scatter',
   data: {
-    datasets: [
-      {
-        label: '⚠ Within 3 marks of next grade',
-        data: atRiskPoints,
-        backgroundColor: atRiskPoints.map(p => gradeColors[p.grade] + '99'),
-        borderColor: '#f97316',
-        borderWidth: 2.5,
-        pointRadius: 7,
-        order: 0
-      },
-      ...Object.keys(grouped).map(grade => ({
-        label: grade,
-        data: grouped[grade],
-        backgroundColor: gradeColors[grade] || '#000',
-        borderColor: 'transparent',
-        pointRadius: 6,
-        order: 1
-      }))
-    ]
+    // Only map the colored grade groups
+    datasets: Object.keys(grouped).map(grade => ({
+      label: grade,
+      data: grouped[grade],
+      backgroundColor: gradeColors[grade] || '#000',
+      borderColor: 'transparent',
+      pointRadius: 6,
+      order: 1
+    }))
   },
   options: {
     responsive: true,
     maintainAspectRatio: false,
-    // CRITICAL FIX: Change interaction mode to 'point'
     interaction: {
-      mode: 'point',    // Only triggers for the specific dot under the cursor
-      intersect: true,  // Must overlap the dot to show info
-      axis: 'xy'        // Checks both horizontal and vertical positions
+      mode: 'point',
+      intersect: true,
+      axis: 'xy'
     },
     plugins: {
       legend: { display: true, position: 'top', labels: { boxWidth: 12, font: { size: 10 } } },
       tooltip: { 
         enabled: true,
-        callbacks: { label: tooltipCallback },
-        position: 'nearest' // Places the tooltip box right at the dot
+        callbacks: { 
+          // Simplified tooltip without the "Needs +X" message
+          label: ctx => {
+            const p = ctx.raw;
+            return [`${p.name} (${p.roll})`, `Score: ${p.x}`, `Grade: ${p.grade}`];
+          } 
+        },
+        position: 'nearest'
       },
-      annotation: { /* ... existing annotations ... */ }
+      annotation: {
+        annotations: gradeCutoffs
+          .filter(c => c.grade !== 'F' && c.min >= minScore - xPad && c.min <= maxScore + xPad)
+          .map(c => ({
+            type: 'line',
+            xMin: c.min, xMax: c.min,
+            borderColor: '#999',
+            borderWidth: 1.5,
+            borderDash: [4, 3],
+            label: {
+              display: true,
+              content: `${c.grade} (${c.min})`,
+              position: 'start',
+              color: '#555',
+              font: { size: 9 }
+            }
+          }))
+      }
     },
     elements: {
       point: {
-        hitRadius: 6,   // Slightly larger than visual radius to make it easier to "hit"
-        hoverRadius: 6,
-        borderWidth: 1
+        hitRadius: 5,
+        hoverRadius: 5
       }
     },
     scales: {
@@ -1099,14 +1111,10 @@ chartInstances['gap'] = new Chart(document.getElementById('chartGap'), {
         ticks: { stepSize: 1, color: '#6b6860' },
         title: { display: true, text: `Score`, color: '#6b6860' }
       },
-      y: { 
-        display: false, 
-        min: -1, 
-        max: maxStack + 1 
-      }
+      y: { display: false, min: -0.5, max: maxStack + 0.5 }
     }
   }
-  });
+});
 }
 // ─── Results Table ────────────────────────────────────────────────────────────
 let sortKey = 'total', sortDir = 1;
