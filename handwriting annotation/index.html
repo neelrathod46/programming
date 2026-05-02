@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Handwriting Labelling</title>
+    <style>
+      :root {
+        --bg: #f5f7ff;
+        --card: #ffffff;
+        --text: #0f172a;
+        --muted: #475569;
+        --border: #dbe2f0;
+        --primary: #2563eb;
+        --primary-2: #1d4ed8;
+        --ok: #166534;
+        --warn: #b45309;
+        --error: #be123c;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: Inter, "Segoe UI", Arial, sans-serif;
+        background: radial-gradient(circle at top left, #eef2ff, var(--bg) 52%);
+        color: var(--text);
+      }
+      .container {
+        max-width: 1080px;
+        margin: 0 auto;
+        padding: 1.5rem 1rem 3rem;
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 1rem 1.1rem;
+        box-shadow: 0 10px 28px rgba(37, 99, 235, 0.08);
+        margin-bottom: 1rem;
+      }
+      .title { margin: 0 0 0.3rem; }
+      .subtitle { color: var(--muted); margin-top: 0; }
+      .status { font-weight: 600; margin: 0.4rem 0; }
+      .error { color: var(--error); }
+      .muted { color: var(--muted); }
+      .dropzone {
+        border: 2px dashed #b8c6e8;
+        border-radius: 12px;
+        padding: 0.9rem;
+        background: #f8faff;
+      }
+      input[type="file"] { width: 100%; }
+      button {
+        border: 0;
+        border-radius: 10px;
+        padding: 0.6rem 0.9rem;
+        background: var(--primary);
+        color: #fff;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      button:hover { background: var(--primary-2); }
+      button.secondary { background: #334155; }
+      button.secondary:hover { background: #1f2937; }
+      .hidden { display: none !important; }
+      .images {
+        display: grid;
+        gap: 0.8rem;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      }
+      .img-card {
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 0.6rem;
+        background: #f8faff;
+      }
+      .img-card img {
+        width: 100%;
+        max-height: 280px;
+        object-fit: contain;
+        border-radius: 8px;
+        border: 1px solid #dbe2f0;
+        background: #fff;
+      }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.55rem;
+        margin-top: 0.8rem;
+      }
+      .actions input {
+        width: 130px;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 0.52rem 0.55rem;
+        text-align: center;
+        font-weight: bold;
+      }
+      progress {
+        width: 100%;
+        height: 14px;
+        border-radius: 99px;
+      }
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 0.7rem;
+      }
+      .stat {
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 0.7rem;
+        background: #f8faff;
+      }
+      .stat .k { color: var(--muted); font-size: 0.9rem; }
+      .stat .v { font-size: 1.2rem; font-weight: 700; }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1 class="title">Handwriting Labelling</h1>
+      <h1></h1>
+      <div class="card">
+        <h3>Upload</h3>
+        <p class="muted">Upload one image (segmented into characters) or a ZIP of character images.</p>
+        <div class="dropzone">
+          <label for="file-input">Image or ZIP</label>
+          <input id="file-input" type="file" accept="image/*,.zip" />
+        </div>
+        <div class="actions">
+          <button id="start-btn">Start Labelling</button>
+        </div>
+        <p id="upload-error" class="error hidden"></p>
+      </div>
+
+      <div id="label-view" class="card hidden">
+        <h3 id="label-title">Character</h3>
+        <progress id="progress" value="0" max="1"></progress>
+        <p id="label-meta" class="muted"></p>
+        <div class="images">
+          <div class="img-card">
+            <p><strong>Original</strong></p>
+            <img id="original-img" alt="Original" />
+          </div>
+          <div class="img-card">
+            <p><strong>Binarized</strong></p>
+            <img id="binary-img" alt="Binary" />
+          </div>
+        </div>
+        <div class="actions">
+          <button id="prev-btn" class="secondary">Previous (P)</button>
+          <input id="label-input" maxlength="1" placeholder="Type Char" />
+          <button id="save-btn">Save Label (Enter)</button>
+          <button id="reject-btn" class="secondary">Reject / Skip (R)</button>
+        </div>
+      </div>
+
+      <div id="done-view" class="card hidden">
+        <h3>Labelling Complete</h3>
+        <div class="stats">
+          <div class="stat"><div class="k">Total Images</div><div id="total-stat" class="v">0</div></div>
+          <div class="stat"><div class="k">Labeled & Saved</div><div id="labeled-stat" class="v">0</div></div>
+          <div class="stat"><div class="k">Rejected / Skipped</div><div id="rejected-stat" class="v">0</div></div>
+        </div>
+        <div class="actions">
+          <button id="download-btn">Download Labeled ZIP</button>
+          <button id="restart-btn" class="secondary">Start New Session</button>
+        </div>
+      </div>
+    </div>
+
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>
